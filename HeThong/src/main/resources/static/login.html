@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Đăng nhập – TEDU</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <style>
+    .toggle-link { text-align: center; margin-top: 16px; font-size: .9rem; color: #666; }
+    .toggle-link a { color: #4361ee; font-weight: 600; }
+    .eye-btn { position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+               background: none; border: none; cursor: pointer; color: #888; }
+    .pw-wrap { position: relative; }
+  </style>
+</head>
+<body>
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div style="font-size:2.8rem">🎓</div>
+      <h2>TEDU School</h2>
+      <p style="color:#888;font-size:.85rem;margin:4px 0 0">Hệ thống quản lý học sinh</p>
+    </div>
+
+    <h3>Đăng nhập</h3>
+    <div id="alert-box"></div>
+
+    <form id="login-form">
+      <div class="form-group" style="margin-bottom:14px">
+        <label>Tên đăng nhập</label>
+        <input type="text" id="username" placeholder="Nhập tên đăng nhập" required />
+      </div>
+      <div class="form-group" style="margin-bottom:20px">
+        <label>Mật khẩu</label>
+        <div class="pw-wrap">
+          <input type="password" id="password" placeholder="Nhập mật khẩu" required />
+          <button type="button" class="eye-btn" onclick="togglePw()"><i class="fa fa-eye" id="eye-icon"></i></button>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:12px" id="btn-login">
+        <i class="fa fa-sign-in-alt"></i> Đăng nhập
+      </button>
+    </form>
+
+    <div class="toggle-link">Chưa có tài khoản? <a href="register.html">Đăng ký ngay</a></div>
+    <div class="toggle-link" style="margin-top:8px">Xem bảng tin công khai: <a href="index.html">Trang bài đăng</a></div>
+
+    <div style="margin-top:20px;padding:12px;background:#f8f9fa;border-radius:8px;font-size:.8rem;color:#666">
+      <strong>Tài khoản demo:</strong><br/>
+      Admin: <code>admin / admin123</code><br/>
+      Giáo viên: <code>giaovien01 / teacher123</code><br/>
+      Kế toán: <code>ketoan01 / teacher123</code><br/>
+      Nội dung: <code>content01 / teacher123</code><br/>
+      Học sinh: <code>hocsinh01 / student123</code>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+  if (isLoggedIn()) {
+    redirectByRole(getUser().role);
+  }
+
+  function redirectByRole(role) {
+    if (role === 'ADMIN' || role === 'TEACHER' || role === 'ACCOUNTANT') {
+      window.location.href = 'admin/dashboard.html';
+      return;
+    }
+    if (role === 'CONTENT_MANAGER') {
+      window.location.href = 'admin/posts.html';
+      return;
+    }
+    window.location.href = 'user/dashboard.html';
+  }
+
+  function togglePw() {
+    const pw = document.getElementById('password');
+    const icon = document.getElementById('eye-icon');
+    if (pw.type === 'password') { pw.type = 'text'; icon.className = 'fa fa-eye-slash'; }
+    else { pw.type = 'password'; icon.className = 'fa fa-eye'; }
+  }
+
+  document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('btn-login');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Đang đăng nhập...';
+    const alertBox = document.getElementById('alert-box');
+    alertBox.innerHTML = '';
+
+    try {
+      const res = await api.login({
+        username: document.getElementById('username').value.trim(),
+        password: document.getElementById('password').value
+      });
+      saveAuth(res.data);
+      alertBox.innerHTML = `<div class="alert alert-success"><i class="fa fa-check-circle"></i> ${res.message}</div>`;
+      setTimeout(() => redirectByRole(res.data.role), 800);
+    } catch (err) {
+      alertBox.innerHTML = `<div class="alert alert-error"><i class="fa fa-times-circle"></i> ${err.message}</div>`;
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa fa-sign-in-alt"></i> Đăng nhập';
+    }
+  });
+</script>
+</body>
+</html>

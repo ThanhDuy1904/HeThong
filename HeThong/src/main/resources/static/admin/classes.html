@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quản lý lớp học – TEDU</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand"><span>🎓</span> TEDU Admin</div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Chính</div>
+      <div class="nav-item" onclick="location.href='dashboard.html'"><i class="fa fa-tachometer-alt"></i> Tổng quan</div>
+      <div class="nav-section">Quản lý</div>
+      <div class="nav-item" onclick="location.href='students.html'"><i class="fa fa-user-graduate"></i> Học sinh</div>
+      <div class="nav-item" onclick="location.href='teachers.html'"><i class="fa fa-chalkboard-teacher"></i> Giáo viên</div>
+      <div class="nav-item active" onclick="location.href='classes.html'"><i class="fa fa-school"></i> Lớp học</div>
+      <div class="nav-item" onclick="location.href='timetable.html'"><i class="fa fa-calendar"></i> Thời khóa biểu</div>
+      <div class="nav-item" onclick="location.href='attendance.html'"><i class="fa fa-check-circle"></i> Điểm danh</div>
+      <div class="nav-item" onclick="location.href='posts.html'"><i class="fa fa-video"></i> Bài đăng video</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar"><i class="fa fa-user"></i></div>
+        <div>
+          <div class="user-name" id="sidebar-username">---</div>
+          <div class="user-role" id="sidebar-role">---</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="logout()"><i class="fa fa-sign-out-alt"></i> Đăng xuất</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main-content">
+    <div class="topbar">
+      <div class="topbar-title"><i class="fa fa-school"></i> Quản lý lớp học</div>
+    </div>
+    <div class="page-body">
+      <div class="card">
+        <div class="card-header">
+          <span>Danh sách lớp học</span>
+          <button class="btn btn-primary" id="btn-add" onclick="openAddModal()"><i class="fa fa-plus"></i> Thêm lớp</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>#</th><th>Tên lớp</th><th>Khối</th><th>Năm học</th><th>Học phí</th><th>Giáo viên chủ nhiệm</th><th>Số học sinh</th><th>Thao tác</th></tr>
+            </thead>
+            <tbody id="classes-table-body"></tbody>
+          </table>
+        </div>
+        <div style="padding:14px 24px;color:#888;font-size:.85rem" id="table-info"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-backdrop" id="class-modal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <span id="modal-title">Thêm lớp học</span>
+      <button class="modal-close" onclick="closeModal('class-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="modal-alert"></div>
+      <form id="class-form">
+        <input type="hidden" id="class-id" />
+        <div class="form-grid single">
+          <div class="form-group">
+            <label>Tên lớp <span style="color:red">*</span></label>
+            <input type="text" id="c-className" placeholder="10A1" required />
+          </div>
+          <div class="form-group">
+            <label>Khối</label>
+            <select id="c-grade">
+              <option value="">-- Chọn khối --</option>
+              <option>10</option><option>11</option><option>12</option>
+              <option>6</option><option>7</option><option>8</option><option>9</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Năm học</label>
+            <input type="text" id="c-schoolYear" placeholder="2025-2026" />
+          </div>
+          <div class="form-group">
+            <label>Học phí (VNĐ)</label>
+            <input type="number" id="c-tuitionFee" min="0" step="1000" placeholder="2500000" />
+          </div>
+          <div class="form-group">
+            <label>Giáo viên chủ nhiệm</label>
+            <select id="c-teacherId">
+              <option value="">-- Không có --</option>
+            </select>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('class-modal')">Hủy</button>
+      <button class="btn btn-primary" onclick="saveClass()"><i class="fa fa-save"></i> Lưu</button>
+    </div>
+  </div>
+</div>
+
+<!-- Students of class modal -->
+<div class="modal-backdrop" id="students-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span id="students-modal-title">Học sinh lớp</span>
+      <button class="modal-close" onclick="closeModal('students-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Họ tên</th><th>Ngày sinh</th><th>SĐT</th><th>Trạng thái</th></tr></thead>
+          <tbody id="class-students-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script>
+  let allTeachers = [];
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    if (!requireAuth()) return;
+    const user = getUser();
+    if (user.role !== 'ADMIN' && user.role !== 'TEACHER' && user.role !== 'ACCOUNTANT') {
+      window.location.href = '../user/dashboard.html'; return;
+    }
+    renderUserInfo();
+    if (!isAdmin()) document.getElementById('btn-add').style.display = 'none';
+    await loadTeachersForSelect();
+    await loadClasses();
+  });
+
+  async function loadTeachersForSelect() {
+    try {
+      const res = await api.teachers.getAll();
+      allTeachers = res.data;
+      const sel = document.getElementById('c-teacherId');
+      sel.innerHTML = '<option value="">-- Không có --</option>' +
+        allTeachers.map(t => `<option value="${t.id}">${t.fullName}${t.subject ? ' ('+t.subject+')' : ''}</option>`).join('');
+    } catch (e) {}
+  }
+
+  async function loadClasses() {
+    try {
+      const res = await api.classes.getAll();
+      renderTable(res.data);
+    } catch (e) { showToast(e.message, 'error'); }
+  }
+
+  function renderTable(classes) {
+    const tbody = document.getElementById('classes-table-body');
+    document.getElementById('table-info').textContent = `Hiển thị ${classes.length} lớp`;
+    if (!classes.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#aaa;padding:30px">Không có dữ liệu</td></tr>';
+      return;
+    }
+    tbody.innerHTML = classes.map((c, i) => `
+      <tr>
+        <td>${i+1}</td>
+        <td><strong>${c.className}</strong></td>
+        <td>${c.grade || '—'}</td>
+        <td>${c.schoolYear || '—'}</td>
+        <td>${formatCurrency(c.tuitionFee)}</td>
+        <td>${c.teacherName || '<span style=color:#aaa>Chưa phân công</span>'}</td>
+        <td>
+          <button class="btn btn-outline btn-sm" onclick="viewStudents(${c.id}, '${c.className}')">
+            <i class="fa fa-users"></i> ${c.studentCount}
+          </button>
+        </td>
+        <td>
+          ${isAdmin() ? `
+          <button class="btn btn-warning btn-sm" onclick="editClass(${c.id})"><i class="fa fa-edit"></i></button>
+          <button class="btn btn-danger btn-sm" onclick="deleteClass(${c.id})" style="margin-left:4px"><i class="fa fa-trash"></i></button>
+          ` : isAccountant() ? `<button class="btn btn-warning btn-sm" onclick="editTuition(${c.id}, '${c.className}', ${c.tuitionFee || 0})"><i class="fa fa-money-bill"></i></button>` : '<span style="color:#aaa">—</span>'}
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function formatCurrency(v) {
+    if (v === null || v === undefined || v === '') return '—';
+    return Number(v).toLocaleString('vi-VN') + ' đ';
+  }
+
+  function openAddModal() {
+    document.getElementById('modal-title').textContent = 'Thêm lớp học mới';
+    document.getElementById('class-form').reset();
+    document.getElementById('class-id').value = '';
+    document.getElementById('modal-alert').innerHTML = '';
+    openModal('class-modal');
+  }
+
+  async function editClass(id) {
+    try {
+      const res = await api.classes.getById(id);
+      const c = res.data;
+      document.getElementById('modal-title').textContent = 'Chỉnh sửa lớp học';
+      document.getElementById('class-id').value = c.id;
+      document.getElementById('c-className').value = c.className;
+      document.getElementById('c-grade').value = c.grade || '';
+      document.getElementById('c-schoolYear').value = c.schoolYear || '';
+      document.getElementById('c-tuitionFee').value = c.tuitionFee || '';
+      document.getElementById('c-teacherId').value = c.teacherId || '';
+      document.getElementById('modal-alert').innerHTML = '';
+      openModal('class-modal');
+    } catch (e) { showToast(e.message, 'error'); }
+  }
+
+  async function saveClass() {
+    const id = document.getElementById('class-id').value;
+    const payload = {
+      className:  document.getElementById('c-className').value.trim(),
+      grade:      document.getElementById('c-grade').value,
+      schoolYear: document.getElementById('c-schoolYear').value,
+      tuitionFee: document.getElementById('c-tuitionFee').value || null,
+      teacherId:  document.getElementById('c-teacherId').value || null,
+    };
+    try {
+      if (id) {
+        await api.classes.update(id, payload);
+        showToast('Cập nhật lớp thành công!');
+      } else {
+        await api.classes.create(payload);
+        showToast('Thêm lớp thành công!');
+      }
+      closeModal('class-modal');
+      loadClasses();
+    } catch (e) {
+      document.getElementById('modal-alert').innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+    }
+  }
+
+  function deleteClass(id) {
+    confirmDelete(async () => {
+      try {
+        await api.classes.delete(id);
+        showToast('Đã xóa lớp!');
+        loadClasses();
+      } catch (e) { showToast(e.message, 'error'); }
+    });
+  }
+
+  async function editTuition(id, className, currentFee) {
+    const fee = prompt(`Nhập học phí mới cho lớp ${className} (VNĐ):`, currentFee || 0);
+    if (fee === null) return;
+    const feeNum = Number(fee);
+    if (Number.isNaN(feeNum) || feeNum < 0) {
+      showToast('Học phí không hợp lệ', 'error');
+      return;
+    }
+    try {
+      await api.classes.updateTuitionFee(id, feeNum);
+      showToast('Cập nhật học phí thành công!');
+      loadClasses();
+    } catch (e) { showToast(e.message, 'error'); }
+  }
+
+  async function viewStudents(classId, className) {
+    document.getElementById('students-modal-title').textContent = `Học sinh lớp ${className}`;
+    try {
+      const res = await api.students.byClass(classId);
+      const body = document.getElementById('class-students-body');
+      const students = res.data;
+      if (!students.length) {
+        body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#aaa">Lớp chưa có học sinh</td></tr>';
+      } else {
+        body.innerHTML = students.map((s, i) => `
+          <tr>
+            <td>${i+1}</td>
+            <td>${s.fullName}</td>
+            <td>${s.dob ? new Date(s.dob).toLocaleDateString('vi-VN') : '—'}</td>
+            <td>${s.phone || '—'}</td>
+            <td><span class="badge ${s.status === 'ACTIVE' ? 'badge-success' : 'badge-danger'}">${s.status === 'ACTIVE' ? 'Đang học' : s.status}</span></td>
+          </tr>
+        `).join('');
+      }
+    } catch (e) { console.error(e); }
+    openModal('students-modal');
+  }
+</script>
+</body>
+</html>

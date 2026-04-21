@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Danh sách học sinh – TEDU</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand"><span>🎓</span> TEDU School</div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Menu</div>
+      <div class="nav-item" onclick="location.href='dashboard.html'"><i class="fa fa-home"></i> Trang chủ</div>
+      <div class="nav-item" onclick="location.href='classes.html'"><i class="fa fa-school"></i> Lớp học của tôi</div>
+      <div class="nav-item active" onclick="location.href='students.html'"><i class="fa fa-users"></i> Danh sách học sinh</div>
+      <div class="nav-item" onclick="location.href='timetable.html'"><i class="fa fa-calendar"></i> Thời khóa biểu</div>
+      <div class="nav-item" onclick="location.href='../index.html'"><i class="fa fa-video"></i> Bài đăng video</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar"><i class="fa fa-user"></i></div>
+        <div>
+          <div class="user-name" id="sidebar-username">---</div>
+          <div class="user-role" id="sidebar-role">---</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="logout()"><i class="fa fa-sign-out-alt"></i> Đăng xuất</button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <div class="topbar">
+      <div class="topbar-title"><i class="fa fa-users"></i> Danh sách học sinh</div>
+    </div>
+    <div class="page-body">
+      <div class="card">
+        <div class="card-header">
+          <div class="search-bar" style="margin:0;flex:1">
+            <input type="text" id="search-input" placeholder="🔍  Tìm kiếm..." style="max-width:320px" />
+            <button class="btn btn-outline" onclick="loadStudents()"><i class="fa fa-search"></i> Tìm</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>#</th><th>Họ tên</th><th>Ngày sinh</th><th>Giới tính</th><th>Lớp</th><th>SĐT</th><th>Trạng thái</th></tr>
+            </thead>
+            <tbody id="students-table-body"></tbody>
+          </table>
+        </div>
+        <div style="padding:14px 24px;color:#888;font-size:.85rem" id="table-info"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', async () => {
+    if (!requireAuth()) return;
+    renderUserInfo();
+    await loadStudents();
+    document.getElementById('search-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') loadStudents();
+    });
+  });
+
+  async function loadStudents() {
+    const kw = document.getElementById('search-input').value.trim();
+    try {
+      const res = await api.students.getAll(kw);
+      const students = res.data;
+      const tbody = document.getElementById('students-table-body');
+      document.getElementById('table-info').textContent = `Hiển thị ${students.length} học sinh`;
+      if (!students.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#aaa;padding:30px">Không có dữ liệu</td></tr>';
+        return;
+      }
+      tbody.innerHTML = students.map((s, i) => `
+        <tr>
+          <td>${i+1}</td>
+          <td><strong>${s.fullName}</strong></td>
+          <td>${s.dob ? new Date(s.dob).toLocaleDateString('vi-VN') : '—'}</td>
+          <td>${s.gender || '—'}</td>
+          <td>${s.className || '—'}</td>
+          <td>${s.phone || '—'}</td>
+          <td><span class="badge ${s.status === 'ACTIVE' ? 'badge-success' : s.status === 'GRADUATED' ? 'badge-info' : 'badge-danger'}">
+            ${s.status === 'ACTIVE' ? 'Đang học' : s.status === 'GRADUATED' ? 'Tốt nghiệp' : 'Nghỉ học'}</span></td>
+        </tr>
+      `).join('');
+    } catch (e) { showToast(e.message, 'error'); }
+  }
+</script>
+</body>
+</html>

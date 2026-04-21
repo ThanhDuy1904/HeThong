@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard – TEDU Admin</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <style>
+    .recent-table td:first-child { font-weight: 600; }
+    .chart-placeholder { height: 180px; background: linear-gradient(135deg,#e8f0fe,#f0e6ff);
+                         border-radius: 10px; display:flex;align-items:center;justify-content:center;
+                         color:#888;font-size:.9rem; }
+  </style>
+</head>
+<body>
+<div class="layout">
+    
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand"><span>🎓</span> TEDU Admin</div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Chính</div>
+      <div class="nav-item active" onclick="location.href='dashboard.html'">
+        <i class="fa fa-tachometer-alt"></i> Tổng quan
+      </div>
+      <div class="nav-section">Quản lý</div>
+      <div class="nav-item" onclick="location.href='students.html'">
+        <i class="fa fa-user-graduate"></i> Học sinh
+      </div>
+      <div class="nav-item" onclick="location.href='teachers.html'">
+        <i class="fa fa-chalkboard-teacher"></i> Giáo viên
+      </div>
+      <div class="nav-item" onclick="location.href='classes.html'">
+        <i class="fa fa-school"></i> Lớp học
+      </div>
+      <div class="nav-item" onclick="location.href='timetable.html'">
+        <i class="fa fa-calendar"></i> Thời khóa biểu
+      </div>
+      <div class="nav-item" onclick="location.href='attendance.html'">
+        <i class="fa fa-check-circle"></i> Điểm danh
+      </div>
+      <div class="nav-item" onclick="location.href='posts.html'">
+        <i class="fa fa-video"></i> Bài đăng video
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar"><i class="fa fa-user"></i></div>
+        <div>
+          <div class="user-name" id="sidebar-username">---</div>
+          <div class="user-role" id="sidebar-role">---</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="logout()"><i class="fa fa-sign-out-alt"></i> Đăng xuất</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main-content">
+    <div class="topbar">
+      <div class="topbar-title"><i class="fa fa-tachometer-alt"></i> Tổng quan hệ thống</div>
+      <div class="topbar-actions">
+        <span id="top-username" style="font-size:.9rem;color:#666"></span>
+      </div>
+    </div>
+
+    <div class="page-body">
+
+      <!-- Stat cards -->
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon bg-blue"><i class="fa fa-user-graduate"></i></div>
+          <div class="stat-info">
+            <div class="value" id="stat-students">—</div>
+            <div class="label">Tổng học sinh</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon bg-green"><i class="fa fa-check-circle"></i></div>
+          <div class="stat-info">
+            <div class="value" id="stat-active">—</div>
+            <div class="label">Học sinh đang học</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon bg-orange"><i class="fa fa-chalkboard-teacher"></i></div>
+          <div class="stat-info">
+            <div class="value" id="stat-teachers">—</div>
+            <div class="label">Giáo viên</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon bg-purple"><i class="fa fa-school"></i></div>
+          <div class="stat-info">
+            <div class="value" id="stat-classes">—</div>
+            <div class="label">Lớp học</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon bg-blue"><i class="fa fa-users"></i></div>
+          <div class="stat-info">
+            <div class="value" id="stat-users">—</div>
+            <div class="label">Tài khoản</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent students -->
+      <div class="card">
+        <div class="card-header">
+          <span><i class="fa fa-user-graduate"></i> Học sinh mới nhất</span>
+          <button class="btn btn-primary btn-sm" onclick="location.href='students.html'">
+            Xem tất cả <i class="fa fa-arrow-right"></i>
+          </button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>#</th><th>Họ tên</th><th>Giới tính</th><th>Lớp</th><th>Trạng thái</th></tr>
+            </thead>
+            <tbody id="recent-students"><tr><td colspan="5" style="text-align:center;color:#aaa">Đang tải...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Quick links -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px">
+        <div class="card" style="cursor:pointer" onclick="location.href='students.html'">
+          <div class="card-body" style="display:flex;align-items:center;gap:16px">
+            <div class="stat-icon bg-blue"><i class="fa fa-plus"></i></div>
+            <div><strong>Thêm học sinh</strong><br/><small style="color:#888">Nhập học sinh mới</small></div>
+          </div>
+        </div>
+        <div class="card" style="cursor:pointer" onclick="location.href='teachers.html'">
+          <div class="card-body" style="display:flex;align-items:center;gap:16px">
+            <div class="stat-icon bg-orange"><i class="fa fa-user-plus"></i></div>
+            <div><strong>Thêm giáo viên</strong><br/><small style="color:#888">Đăng ký giáo viên mới</small></div>
+          </div>
+        </div>
+        <div class="card" style="cursor:pointer" onclick="location.href='classes.html'">
+          <div class="card-body" style="display:flex;align-items:center;gap:16px">
+            <div class="stat-icon bg-purple"><i class="fa fa-folder-plus"></i></div>
+            <div><strong>Tạo lớp</strong><br/><small style="color:#888">Thêm lớp học mới</small></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', async () => {
+    if (!requireAuth()) return;
+    const user = getUser();
+    if (user.role !== 'ADMIN' && user.role !== 'TEACHER' && user.role !== 'ACCOUNTANT') {
+      window.location.href = '../user/dashboard.html'; return;
+    }
+    renderUserInfo();
+    document.getElementById('top-username').textContent = user.fullName || user.username;
+
+    // Load dashboard stats (admin only)
+    if (isAdmin()) {
+      try {
+        const res = await api.dashboard();
+        const d = res.data;
+        document.getElementById('stat-students').textContent = d.totalStudents;
+        document.getElementById('stat-active').textContent   = d.activeStudents;
+        document.getElementById('stat-teachers').textContent = d.totalTeachers;
+        document.getElementById('stat-classes').textContent  = d.totalClasses;
+        document.getElementById('stat-users').textContent    = d.totalUsers;
+      } catch (e) { console.error(e); }
+    }
+
+    // Load recent students
+    try {
+      const res = await api.students.getAll();
+      const students = res.data.slice(0, 8);
+      const tbody = document.getElementById('recent-students');
+      if (!students.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#aaa">Chưa có học sinh</td></tr>';
+        return;
+      }
+      tbody.innerHTML = students.map((s, i) => `
+        <tr>
+          <td>${i+1}</td>
+          <td>${s.fullName}</td>
+          <td>${s.gender || '—'}</td>
+          <td>${s.className || '—'}</td>
+          <td><span class="badge ${s.status === 'ACTIVE' ? 'badge-success' : 'badge-danger'}">${s.status === 'ACTIVE' ? 'Đang học' : s.status}</span></td>
+        </tr>
+      `).join('');
+    } catch (e) { console.error(e); }
+  });
+</script>
+</body>
+</html>

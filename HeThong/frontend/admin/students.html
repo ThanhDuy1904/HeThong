@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quản lý học sinh – TEDU</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand"><span>🎓</span> TEDU Admin</div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Chính</div>
+      <div class="nav-item" onclick="location.href='dashboard.html'"><i class="fa fa-tachometer-alt"></i> Tổng quan</div>
+      <div class="nav-section">Quản lý</div>
+      <div class="nav-item active" onclick="location.href='students.html'"><i class="fa fa-user-graduate"></i> Học sinh</div>
+      <div class="nav-item" onclick="location.href='teachers.html'"><i class="fa fa-chalkboard-teacher"></i> Giáo viên</div>
+      <div class="nav-item" onclick="location.href='classes.html'"><i class="fa fa-school"></i> Lớp học</div>
+      <div class="nav-item" onclick="location.href='timetable.html'"><i class="fa fa-calendar"></i> Thời khóa biểu</div>
+      <div class="nav-item" onclick="location.href='attendance.html'"><i class="fa fa-check-circle"></i> Điểm danh</div>
+      <div class="nav-item" onclick="location.href='posts.html'"><i class="fa fa-video"></i> Bài đăng video</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar"><i class="fa fa-user"></i></div>
+        <div>
+          <div class="user-name" id="sidebar-username">---</div>
+          <div class="user-role" id="sidebar-role">---</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="logout()"><i class="fa fa-sign-out-alt"></i> Đăng xuất</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main-content">
+    <div class="topbar">
+      <div class="topbar-title"><i class="fa fa-user-graduate"></i> Quản lý học sinh</div>
+    </div>
+    <div class="page-body">
+
+      <div class="card">
+        <div class="card-header">
+          <div class="search-bar" style="margin:0;flex:1">
+            <input type="text" id="search-input" placeholder="🔍  Tìm kiếm theo tên, số điện thoại..." style="max-width:350px" />
+            <button class="btn btn-outline" onclick="loadStudents()"><i class="fa fa-search"></i> Tìm</button>
+          </div>
+          <button class="btn btn-primary" onclick="openAddModal()"><i class="fa fa-plus"></i> Thêm học sinh</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>#</th><th>Họ tên</th><th>Ngày sinh</th><th>Giới tính</th><th>Lớp</th><th>Học phí lớp</th><th>Đã đóng</th><th>Còn lại</th><th>SĐT</th><th>Trạng thái</th><th>Thao tác</th></tr>
+            </thead>
+            <tbody id="students-table-body"></tbody>
+          </table>
+        </div>
+        <div style="padding:14px 24px;color:#888;font-size:.85rem" id="table-info"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-backdrop" id="student-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span id="modal-title">Thêm học sinh</span>
+      <button class="modal-close" onclick="closeModal('student-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="modal-alert"></div>
+      <form id="student-form">
+        <input type="hidden" id="student-id" />
+        <div class="form-grid">
+          <div class="form-group full">
+            <label>Họ và tên <span style="color:red">*</span></label>
+            <input type="text" id="s-fullName" required />
+          </div>
+          <div class="form-group">
+            <label>Ngày sinh</label>
+            <input type="date" id="s-dob" />
+          </div>
+          <div class="form-group">
+            <label>Giới tính</label>
+            <select id="s-gender">
+              <option value="">-- Chọn --</option>
+              <option>Nam</option><option>Nữ</option><option>Khác</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Số điện thoại</label>
+            <input type="text" id="s-phone" />
+          </div>
+          <div class="form-group">
+            <label>Lớp</label>
+            <select id="s-classId"></select>
+          </div>
+          <div class="form-group full">
+            <label>Địa chỉ</label>
+            <input type="text" id="s-address" />
+          </div>
+          <div class="form-group">
+            <label>Tên phụ huynh</label>
+            <input type="text" id="s-parentName" />
+          </div>
+          <div class="form-group">
+            <label>SĐT phụ huynh</label>
+            <input type="text" id="s-parentPhone" />
+          </div>
+          <div class="form-group">
+            <label>Trạng thái</label>
+            <select id="s-status">
+              <option value="ACTIVE">Đang học</option>
+              <option value="INACTIVE">Nghỉ học</option>
+              <option value="GRADUATED">Tốt nghiệp</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Đã đóng học phí (VNĐ)</label>
+            <input type="number" id="s-tuitionPaidAmount" min="0" step="1000" value="0" />
+          </div>
+          <div class="form-group" style="display:flex;align-items:center;gap:8px;margin-top:26px">
+            <input type="checkbox" id="s-tuitionPaidFull" onchange="onTuitionPaidFullChange()" />
+            <label for="s-tuitionPaidFull" style="margin:0">Đã đóng đủ học phí</label>
+          </div>
+        </div>
+
+        <!-- Account creation (only for new) -->
+        <div id="account-section" style="margin-top:18px;padding-top:14px;border-top:1px solid #eee">
+          <p style="font-weight:600;font-size:.9rem;margin-bottom:10px"><i class="fa fa-key"></i> Tạo tài khoản đăng nhập (tùy chọn)</p>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Tên đăng nhập</label>
+              <input type="text" id="s-username" />
+            </div>
+            <div class="form-group">
+              <label>Mật khẩu</label>
+              <input type="password" id="s-password" placeholder="Mặc định: student123" />
+            </div>
+            <div class="form-group full">
+              <label>Email</label>
+              <input type="email" id="s-email" />
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('student-modal')">Hủy</button>
+      <button class="btn btn-primary" onclick="saveStudent()"><i class="fa fa-save"></i> Lưu</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script>
+  let allClasses = [];
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    if (!requireAuth()) return;
+    const user = getUser();
+    if (user.role !== 'ADMIN' && user.role !== 'TEACHER' && user.role !== 'ACCOUNTANT') {
+      window.location.href = '../user/dashboard.html'; return;
+    }
+    renderUserInfo();
+    await loadClasses();
+    await loadStudents();
+
+    document.getElementById('search-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') loadStudents();
+    });
+  });
+
+  async function loadStudents() {
+    const kw = document.getElementById('search-input').value.trim();
+    try {
+      const res = await api.students.getAll(kw);
+      renderTable(res.data);
+    } catch (e) { showToast(e.message, 'error'); }
+  }
+
+  async function loadClasses() {
+    try {
+      const res = await api.classes.getAll();
+      allClasses = res.data;
+      const sel = document.getElementById('s-classId');
+      sel.innerHTML = '<option value="">-- Chọn lớp --</option>' +
+        allClasses.map(c => `<option value="${c.id}">${c.className}</option>`).join('');
+    } catch (e) {}
+  }
+
+  function renderTable(students) {
+    const tbody = document.getElementById('students-table-body');
+    const info  = document.getElementById('table-info');
+    info.textContent = `Hiển thị ${students.length} học sinh`;
+    if (!students.length) {
+      tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#aaa;padding:30px">Không có dữ liệu</td></tr>';
+      return;
+    }
+    tbody.innerHTML = students.map((s, i) => `
+      <tr>
+        <td>${i+1}</td>
+        <td><strong>${s.fullName}</strong></td>
+        <td>${s.dob ? new Date(s.dob).toLocaleDateString('vi-VN') : '—'}</td>
+        <td>${s.gender || '—'}</td>
+        <td>${s.className || '—'}</td>
+        <td>${formatCurrency(s.classTuitionFee)}</td>
+        <td>${formatCurrency(s.tuitionPaidAmount)}</td>
+        <td>
+          ${formatCurrency(s.tuitionRemaining)}
+          <div style="margin-top:4px">${s.tuitionPaidFull ? '<span class="badge badge-success">Đã đủ</span>' : '<span class="badge badge-warning">Chưa đủ</span>'}</div>
+        </td>
+        <td>${s.phone || '—'}</td>
+        <td><span class="badge ${s.status === 'ACTIVE' ? 'badge-success' : s.status === 'GRADUATED' ? 'badge-info' : 'badge-danger'}">
+          ${s.status === 'ACTIVE' ? 'Đang học' : s.status === 'GRADUATED' ? 'Tốt nghiệp' : 'Nghỉ học'}</span></td>
+        <td>
+          <button class="btn btn-warning btn-sm" onclick="editStudent(${s.id})"><i class="fa fa-edit"></i></button>
+          ${isAdmin() ? `<button class="btn btn-danger btn-sm" onclick="deleteStudent(${s.id})" style="margin-left:4px"><i class="fa fa-trash"></i></button>` : ''}
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function formatCurrency(v) {
+    if (v === null || v === undefined || v === '') return '—';
+    return Number(v).toLocaleString('vi-VN') + ' đ';
+  }
+
+  function onTuitionPaidFullChange() {
+    const checked = document.getElementById('s-tuitionPaidFull').checked;
+    const amountInput = document.getElementById('s-tuitionPaidAmount');
+    if (checked) {
+      const classId = document.getElementById('s-classId').value;
+      const cls = allClasses.find(c => String(c.id) === String(classId));
+      if (cls && cls.tuitionFee !== null && cls.tuitionFee !== undefined) {
+        amountInput.value = cls.tuitionFee;
+      }
+    }
+  }
+
+  function openAddModal() {
+    document.getElementById('modal-title').textContent = 'Thêm học sinh mới';
+    document.getElementById('student-form').reset();
+    document.getElementById('student-id').value = '';
+    document.getElementById('modal-alert').innerHTML = '';
+    document.getElementById('account-section').style.display = '';
+    openModal('student-modal');
+  }
+
+  async function editStudent(id) {
+    try {
+      const res = await api.students.getById(id);
+      const s = res.data;
+      document.getElementById('modal-title').textContent = 'Chỉnh sửa học sinh';
+      document.getElementById('student-id').value = s.id;
+      document.getElementById('s-fullName').value = s.fullName || '';
+      document.getElementById('s-dob').value = s.dob ? s.dob.substring(0,10) : '';
+      document.getElementById('s-gender').value = s.gender || '';
+      document.getElementById('s-phone').value = s.phone || '';
+      document.getElementById('s-classId').value = s.classId || '';
+      document.getElementById('s-address').value = s.address || '';
+      document.getElementById('s-parentName').value = s.parentName || '';
+      document.getElementById('s-parentPhone').value = s.parentPhone || '';
+      document.getElementById('s-status').value = s.status || 'ACTIVE';
+      document.getElementById('s-tuitionPaidAmount').value = s.tuitionPaidAmount || 0;
+      document.getElementById('s-tuitionPaidFull').checked = !!s.tuitionPaidFull;
+      document.getElementById('account-section').style.display = 'none';
+      document.getElementById('modal-alert').innerHTML = '';
+      openModal('student-modal');
+    } catch (e) { showToast(e.message, 'error'); }
+  }
+
+  async function saveStudent() {
+    const id = document.getElementById('student-id').value;
+    const payload = {
+      fullName:    document.getElementById('s-fullName').value.trim(),
+      dob:         document.getElementById('s-dob').value || null,
+      gender:      document.getElementById('s-gender').value,
+      phone:       document.getElementById('s-phone').value,
+      classId:     document.getElementById('s-classId').value || null,
+      address:     document.getElementById('s-address').value,
+      parentName:  document.getElementById('s-parentName').value,
+      parentPhone: document.getElementById('s-parentPhone').value,
+      status:      document.getElementById('s-status').value,
+      tuitionPaidAmount: document.getElementById('s-tuitionPaidAmount').value || 0,
+      tuitionPaidFull: document.getElementById('s-tuitionPaidFull').checked,
+    };
+    if (!id) {
+      payload.username = document.getElementById('s-username').value.trim() || null;
+      payload.password = document.getElementById('s-password').value || null;
+      payload.email    = document.getElementById('s-email').value.trim() || null;
+    }
+
+    try {
+      if (id) {
+        await api.students.update(id, payload);
+        showToast('Cập nhật học sinh thành công!');
+      } else {
+        await api.students.create(payload);
+        showToast('Thêm học sinh thành công!');
+      }
+      closeModal('student-modal');
+      loadStudents();
+    } catch (e) {
+      document.getElementById('modal-alert').innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+    }
+  }
+
+  function deleteStudent(id) {
+    confirmDelete(async () => {
+      try {
+        await api.students.delete(id);
+        showToast('Đã xóa học sinh!');
+        loadStudents();
+      } catch (e) { showToast(e.message, 'error'); }
+    });
+  }
+</script>
+</body>
+</html>

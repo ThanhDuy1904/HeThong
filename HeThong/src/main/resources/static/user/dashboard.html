@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trang cá nhân – TEDU</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <style>
+    .profile-card { display: flex; gap: 28px; align-items: flex-start; }
+    .avatar-circle {
+      width: 100px; height: 100px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--info));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2.8rem; color: #fff; flex-shrink: 0;
+    }
+    .profile-info { flex: 1; }
+    .info-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
+    .info-label { font-weight: 600; min-width: 130px; color: #555; }
+    .info-value { color: #333; }
+    .notice-box {
+      background: linear-gradient(135deg, #e8f0fe, #f0e6ff);
+      border-radius: 12px; padding: 20px 24px; margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand"><span>🎓</span> TEDU School</div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Menu</div>
+      <div class="nav-item active" onclick="location.href='dashboard.html'"><i class="fa fa-home"></i> Trang chủ</div>
+      <div class="nav-item" onclick="location.href='classes.html'"><i class="fa fa-school"></i> Lớp học của tôi</div>
+      <div class="nav-item" onclick="location.href='timetable.html'"><i class="fa fa-calendar"></i> Thời khóa biểu</div>
+       <div class="nav-item" onclick="location.href='../index.html'"><i class="fa fa-video"></i> Bài đăng video</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar"><i class="fa fa-user"></i></div>
+        <div>
+          <div class="user-name" id="sidebar-username">---</div>
+          <div class="user-role" id="sidebar-role">---</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="logout()"><i class="fa fa-sign-out-alt"></i> Đăng xuất</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main-content">
+    <div class="topbar">
+      <div class="topbar-title">👋 Xin chào!</div>
+      <div class="topbar-actions">
+        <span id="top-greeting" style="font-size:.9rem;color:#666"></span>
+      </div>
+    </div>
+
+    <div class="page-body">
+
+      <!-- Welcome banner -->
+      <div class="notice-box">
+        <h3 style="margin:0 0 8px;color:var(--primary)">🎓 Hệ thống quản lý TEDU School</h3>
+        <p style="margin:0;color:#555">Chào mừng bạn đến với hệ thống quản lý học sinh TEDU.
+           Sử dụng menu bên trái để xem thông tin lớp học và danh sách học sinh.</p>
+      </div>
+
+      <!-- Profile info -->
+      <div class="card" id="profile-card" style="display:none">
+        <div class="card-header"><i class="fa fa-id-card"></i> Thông tin tài khoản</div>
+        <div class="card-body">
+          <div class="profile-card">
+            <div class="avatar-circle" id="avatar-letter">?</div>
+            <div class="profile-info" id="profile-info"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- School info & announcements -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+        <div class="card">
+          <div class="card-header"><i class="fa fa-bell"></i> Thông báo</div>
+          <div class="card-body">
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <div style="padding:12px;background:#f8f9fa;border-radius:8px;border-left:4px solid var(--primary)">
+                <strong>Lịch thi học kỳ 2</strong>
+                <p style="margin:4px 0 0;font-size:.85rem;color:#666">Lịch thi bắt đầu từ 15/05/2026. Học sinh cần mang đủ giấy tờ.</p>
+              </div>
+              <div style="padding:12px;background:#f8f9fa;border-radius:8px;border-left:4px solid #2d9e5c">
+                <strong>Họp phụ huynh</strong>
+                <p style="margin:4px 0 0;font-size:.85rem;color:#666">Cuộc họp phụ huynh học kỳ 2 diễn ra ngày 01/04/2026.</p>
+              </div>
+              <div style="padding:12px;background:#f8f9fa;border-radius:8px;border-left:4px solid var(--warning)">
+                <strong>Nộp học phí</strong>
+                <p style="margin:4px 0 0;font-size:.85rem;color:#666">Hạn nộp học phí học kỳ 2: 31/03/2026.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><i class="fa fa-calendar"></i> Lịch học tuần này</div>
+          <div class="card-body">
+            <table style="font-size:.86rem">
+              <tr><th width="80">Thứ</th><th>Buổi sáng</th><th>Buổi chiều</th></tr>
+              <tbody id="schedule-table-body">
+                <tr><td colspan="3" style="text-align:center;padding:20px;color:#999">Đang tải...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    if (!requireAuth()) return;
+    const user = getUser();
+    renderUserInfo();
+
+    const greeting = document.getElementById('top-greeting');
+    greeting.textContent = `${user.fullName || user.username} – ${user.role}`;
+
+    // Show profile card
+    const card = document.getElementById('profile-card');
+    card.style.display = '';
+
+    const letter = (user.fullName || user.username || '?')[0].toUpperCase();
+    document.getElementById('avatar-letter').textContent = letter;
+
+    const info = document.getElementById('profile-info');
+    info.innerHTML = `
+      <div class="info-row"><span class="info-label"><i class="fa fa-user"></i> Họ và tên:</span><span class="info-value"><strong>${user.fullName || '—'}</strong></span></div>
+      <div class="info-row"><span class="info-label"><i class="fa fa-at"></i> Tên đăng nhập:</span><span class="info-value">${user.username}</span></div>
+      <div class="info-row"><span class="info-label"><i class="fa fa-envelope"></i> Email:</span><span class="info-value">${user.email || '—'}</span></div>
+      <div class="info-row"><span class="info-label"><i class="fa fa-shield-alt"></i> Vai trò:</span><span class="info-value"><span class="badge ${user.role === 'ADMIN' ? 'badge-danger' : user.role === 'TEACHER' ? 'badge-warning' : 'badge-success'}">${user.role}</span></span></div>
+    `;
+
+    // Load schedule for student
+    loadMySchedule();
+  });
+
+  async function loadMySchedule() {
+    try {
+      const user = getUser();
+      
+      // Get student info to find class
+      const resp = await api.students.getAll();
+      const myStudent = resp.data.find(s => s.userId === user.id);
+
+      if (!myStudent || !myStudent.classId) {
+        document.getElementById('schedule-table-body').innerHTML = `
+          <tr><td colspan="3" style="text-align:center;padding:20px;color:#999">Bạn chưa được phân lớp</td></tr>
+        `;
+        return;
+      }
+
+      // Load schedules for the class
+      const scheduleResp = await api.schedules.getByClass(myStudent.classId);
+      const schedules = scheduleResp.data;
+
+      if (schedules.length === 0) {
+        document.getElementById('schedule-table-body').innerHTML = `
+          <tr><td colspan="3" style="text-align:center;padding:20px;color:#999">Chưa có thời khóa biểu</td></tr>
+        `;
+        return;
+      }
+
+      // Group by day of week and session (morning/afternoon)
+      const dayNames = {
+        2: 'Thứ 2',
+        3: 'Thứ 3',
+        4: 'Thứ 4',
+        5: 'Thứ 5',
+        6: 'Thứ 6',
+        7: 'Thứ 7',
+        1: 'Chủ nhật'
+      };
+
+      const schedulesByDay = {};
+      [2, 3, 4, 5, 6, 7, 1].forEach(day => {
+        schedulesByDay[day] = { morning: [], afternoon: [] };
+      });
+
+      schedules.forEach(s => {
+        const hour = parseInt(s.startTime.split(':')[0]);
+        const session = hour < 12 ? 'morning' : 'afternoon';
+        if (schedulesByDay[s.dayOfWeek]) {
+          schedulesByDay[s.dayOfWeek][session].push(s.subject);
+        }
+      });
+
+      // Render table
+      const tbody = document.getElementById('schedule-table-body');
+      tbody.innerHTML = '';
+
+      [2, 3, 4, 5, 6].forEach(day => { // Only weekdays
+        const morning = schedulesByDay[day].morning.join(', ') || '—';
+        const afternoon = schedulesByDay[day].afternoon.join(', ') || '—';
+        
+        tbody.innerHTML += `
+          <tr>
+            <td><strong>${dayNames[day]}</strong></td>
+            <td>${morning}</td>
+            <td>${afternoon}</td>
+          </tr>
+        `;
+      });
+
+    } catch (err) {
+      console.error('Load schedule error:', err);
+      document.getElementById('schedule-table-body').innerHTML = `
+        <tr><td colspan="3" style="text-align:center;padding:20px;color:#f44">Lỗi tải dữ liệu</td></tr>
+      `;
+    }
+  }
+</script>
+</body>
+</html>

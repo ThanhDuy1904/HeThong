@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bài đăng video – TEDU</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <style>
+    .posts-wrap { max-width: 1080px; margin: 30px auto; padding: 0 16px 30px; }
+    .hero {
+      background: linear-gradient(135deg, #0ea5e9, #1d4ed8);
+      color: #fff;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .post-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+    }
+    .post-card {
+      border: 1px solid #e7ebf0;
+      border-radius: 14px;
+      overflow: hidden;
+      background: #fff;
+      box-shadow: 0 8px 20px rgba(2, 6, 23, 0.05);
+    }
+    .post-card iframe {
+      width: 100%;
+      height: 220px;
+      border: 0;
+    }
+    .post-body { padding: 14px; }
+    .meta { color: #6b7280; font-size: .82rem; margin-top: 6px; }
+  </style>
+</head>
+<body style="background:#f5f8fc">
+  <div class="posts-wrap">
+    <div class="hero">
+      <div>
+        <h2 style="margin:0 0 8px">🎬 Bảng tin video TEDU</h2>
+        <p style="margin:0;opacity:.9">Trang mặc định của hệ thống. Xem nội dung mới nhất từ nhà trường.</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a class="btn btn-outline" href="register.html" style="background:#fff">Đăng ký</a>
+        <a class="btn btn-primary" href="login.html"><i class="fa fa-sign-in-alt"></i> Đăng nhập</a>
+      </div>
+    </div>
+
+    <div id="post-grid" class="post-grid"></div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadPosts();
+    });
+
+    async function loadPosts() {
+      const wrap = document.getElementById('post-grid');
+      wrap.innerHTML = '<div class="card" style="padding:18px">Đang tải bài đăng...</div>';
+      try {
+        const res = await api.posts.getPublished();
+        const posts = res.data || [];
+        if (!posts.length) {
+          wrap.innerHTML = '<div class="card" style="padding:18px">Chưa có bài đăng video nào.</div>';
+          return;
+        }
+        wrap.innerHTML = posts.map(p => `
+          <article class="post-card">
+            <iframe src="${normalizeUrl(p.videoUrl)}" allowfullscreen></iframe>
+            <div class="post-body">
+              <h3 style="margin:0 0 8px">${p.title}</h3>
+              <p style="margin:0;color:#374151">${p.content || ''}</p>
+              <div class="meta">Đăng bởi: ${p.createdByName || 'TEDU'} | ${formatDate(p.createdAt)}</div>
+            </div>
+          </article>
+        `).join('');
+      } catch (e) {
+        wrap.innerHTML = `<div class="card" style="padding:18px;color:#ef4444">${e.message}</div>`;
+      }
+    }
+
+    function formatDate(v) {
+      if (!v) return 'N/A';
+      return new Date(v).toLocaleString('vi-VN');
+    }
+
+    function normalizeUrl(url) {
+      if (!url) return '';
+      if (url.includes('watch?v=')) {
+        return url.replace('watch?v=', 'embed/');
+      }
+      return url;
+    }
+  </script>
+</body>
+</html>

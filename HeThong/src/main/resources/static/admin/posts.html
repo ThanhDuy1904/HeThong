@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quản lý bài đăng video – TEDU</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-brand"><span>🎓</span> TEDU Admin</div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Chính</div>
+      <div class="nav-item" onclick="location.href='dashboard.html'"><i class="fa fa-tachometer-alt"></i> Tổng quan</div>
+      <div class="nav-section">Quản lý</div>
+      <div class="nav-item" onclick="location.href='students.html'"><i class="fa fa-user-graduate"></i> Học sinh</div>
+      <div class="nav-item" onclick="location.href='teachers.html'"><i class="fa fa-chalkboard-teacher"></i> Giáo viên</div>
+      <div class="nav-item" onclick="location.href='classes.html'"><i class="fa fa-school"></i> Lớp học</div>
+      <div class="nav-item" onclick="location.href='timetable.html'"><i class="fa fa-calendar"></i> Thời khóa biểu</div>
+      <div class="nav-item" onclick="location.href='attendance.html'"><i class="fa fa-check-circle"></i> Điểm danh</div>
+      <div class="nav-item active" onclick="location.href='posts.html'"><i class="fa fa-video"></i> Bài đăng video</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar"><i class="fa fa-user"></i></div>
+        <div>
+          <div class="user-name" id="sidebar-username">---</div>
+          <div class="user-role" id="sidebar-role">---</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="logout()"><i class="fa fa-sign-out-alt"></i> Đăng xuất</button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <div class="topbar">
+      <div class="topbar-title"><i class="fa fa-video"></i> Quản lý bài đăng video</div>
+      <div class="topbar-actions">
+        <a class="btn btn-outline" href="../index.html"><i class="fa fa-external-link-alt"></i> Xem trang công khai</a>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="card">
+        <div class="card-header">
+          <span>Danh sách bài đăng</span>
+          <button class="btn btn-primary" onclick="openAddModal()"><i class="fa fa-plus"></i> Tạo bài đăng</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>#</th><th>Tiêu đề</th><th>Trạng thái</th><th>Người đăng</th><th>Ngày đăng</th><th>Thao tác</th></tr>
+            </thead>
+            <tbody id="posts-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="post-modal">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <span id="post-modal-title">Tạo bài đăng video</span>
+      <button class="modal-close" onclick="closeModal('post-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="post-modal-alert"></div>
+      <form id="post-form">
+        <input type="hidden" id="p-id" />
+        <div class="form-grid single">
+          <div class="form-group">
+            <label>Tiêu đề <span style="color:red">*</span></label>
+            <input type="text" id="p-title" required />
+          </div>
+          <div class="form-group">
+            <label>URL video Youtube <span style="color:red">*</span></label>
+            <input type="text" id="p-videoUrl" placeholder="https://www.youtube.com/watch?v=..." required />
+          </div>
+          <div class="form-group">
+            <label>Nội dung mô tả</label>
+            <textarea id="p-content" rows="4"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Trạng thái</label>
+            <select id="p-published">
+              <option value="true">Hiển thị công khai</option>
+              <option value="false">Lưu nháp</option>
+            </select>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('post-modal')">Hủy</button>
+      <button class="btn btn-primary" onclick="savePost()"><i class="fa fa-save"></i> Lưu</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', async () => {
+    if (!requireAuth()) return;
+    const role = getUser()?.role;
+    if (!['ADMIN', 'CONTENT_MANAGER'].includes(role)) {
+      window.location.href = '../user/dashboard.html';
+      return;
+    }
+    renderUserInfo();
+    await loadPosts();
+  });
+
+  async function loadPosts() {
+    try {
+      const res = await api.posts.getAll();
+      const rows = res.data || [];
+      const body = document.getElementById('posts-body');
+      if (!rows.length) {
+        body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#aaa;padding:24px">Chưa có bài đăng</td></tr>';
+        return;
+      }
+      body.innerHTML = rows.map((p, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><strong>${p.title}</strong></td>
+          <td><span class="badge ${p.published ? 'badge-success' : 'badge-warning'}">${p.published ? 'Công khai' : 'Nháp'}</span></td>
+          <td>${p.createdByName || '—'}</td>
+          <td>${formatDate(p.createdAt)}</td>
+          <td>
+            <button class="btn btn-warning btn-sm" onclick="editPost(${p.id})"><i class="fa fa-edit"></i></button>
+            <button class="btn btn-danger btn-sm" onclick="deletePost(${p.id})" style="margin-left:4px"><i class="fa fa-trash"></i></button>
+          </td>
+        </tr>
+      `).join('');
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }
+
+  function openAddModal() {
+    document.getElementById('post-modal-title').textContent = 'Tạo bài đăng video';
+    document.getElementById('post-form').reset();
+    document.getElementById('p-id').value = '';
+    document.getElementById('post-modal-alert').innerHTML = '';
+    openModal('post-modal');
+  }
+
+  async function editPost(id) {
+    try {
+      const res = await api.posts.getById(id);
+      const p = res.data;
+      document.getElementById('post-modal-title').textContent = 'Chỉnh sửa bài đăng';
+      document.getElementById('p-id').value = p.id;
+      document.getElementById('p-title').value = p.title || '';
+      document.getElementById('p-videoUrl').value = p.videoUrl || '';
+      document.getElementById('p-content').value = p.content || '';
+      document.getElementById('p-published').value = p.published ? 'true' : 'false';
+      document.getElementById('post-modal-alert').innerHTML = '';
+      openModal('post-modal');
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }
+
+  async function savePost() {
+    const id = document.getElementById('p-id').value;
+    const payload = {
+      title: document.getElementById('p-title').value.trim(),
+      videoUrl: document.getElementById('p-videoUrl').value.trim(),
+      content: document.getElementById('p-content').value.trim(),
+      published: document.getElementById('p-published').value === 'true'
+    };
+
+    try {
+      if (id) {
+        await api.posts.update(id, payload);
+        showToast('Cập nhật bài đăng thành công');
+      } else {
+        await api.posts.create(payload);
+        showToast('Tạo bài đăng thành công');
+      }
+      closeModal('post-modal');
+      await loadPosts();
+    } catch (e) {
+      document.getElementById('post-modal-alert').innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+    }
+  }
+
+  function deletePost(id) {
+    confirmDelete(async () => {
+      try {
+        await api.posts.delete(id);
+        showToast('Đã xóa bài đăng');
+        await loadPosts();
+      } catch (e) {
+        showToast(e.message, 'error');
+      }
+    });
+  }
+
+  function formatDate(v) {
+    if (!v) return '—';
+    return new Date(v).toLocaleString('vi-VN');
+  }
+</script>
+</body>
+</html>

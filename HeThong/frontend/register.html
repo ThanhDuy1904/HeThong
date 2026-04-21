@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Đăng ký – TEDU</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+<div class="auth-wrapper">
+  <div class="auth-card" style="max-width:520px">
+    <div class="auth-logo">
+      <div style="font-size:2.8rem">🎓</div>
+      <h2>TEDU School</h2>
+    </div>
+    <h3>Tạo tài khoản</h3>
+    <div id="alert-box"></div>
+
+    <form id="reg-form">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Họ và tên <span style="color:red">*</span></label>
+          <input type="text" id="fullName" placeholder="Nguyễn Văn A" required />
+        </div>
+        <div class="form-group">
+          <label>Tên đăng nhập <span style="color:red">*</span></label>
+          <input type="text" id="username" placeholder="username" required minlength="3" />
+        </div>
+        <div class="form-group">
+          <label>Email <span style="color:red">*</span></label>
+          <input type="email" id="email" placeholder="email@example.com" required />
+        </div>
+        <div class="form-group">
+          <label>Mật khẩu <span style="color:red">*</span></label>
+          <input type="password" id="password" placeholder="Tối thiểu 6 ký tự" required minlength="6" />
+        </div>
+        <div class="form-group full">
+          <label>Vai trò</label>
+          <select id="role">
+            <option value="STUDENT">Học sinh</option>
+            <option value="TEACHER">Giáo viên</option>
+            <option value="ACCOUNTANT">Kế toán</option>
+            <option value="CONTENT_MANAGER">Quản lý nội dung</option>
+          </select>
+        </div>
+      </div>
+      <br/>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:12px" id="btn-reg">
+        <i class="fa fa-user-plus"></i> Đăng ký
+      </button>
+    </form>
+
+    <div class="toggle-link" style="margin-top:16px;text-align:center;font-size:.9rem;color:#666">
+      Đã có tài khoản? <a href="login.html" style="color:#4361ee;font-weight:600">Đăng nhập</a>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+  if (isLoggedIn()) {
+    const r = getUser().role;
+    if (r === 'ADMIN' || r === 'TEACHER' || r === 'ACCOUNTANT') window.location.href = 'admin/dashboard.html';
+    else if (r === 'CONTENT_MANAGER') window.location.href = 'admin/posts.html';
+    else window.location.href = 'user/dashboard.html';
+  }
+
+  document.getElementById('reg-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('btn-reg');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Đang xử lý...';
+    const alertBox = document.getElementById('alert-box');
+    alertBox.innerHTML = '';
+
+    try {
+      const res = await api.register({
+        fullName: document.getElementById('fullName').value.trim(),
+        username: document.getElementById('username').value.trim(),
+        email:    document.getElementById('email').value.trim(),
+        password: document.getElementById('password').value,
+        role:     document.getElementById('role').value
+      });
+      saveAuth(res.data);
+      alertBox.innerHTML = `<div class="alert alert-success"><i class="fa fa-check-circle"></i> Đăng ký thành công! Đang chuyển hướng...</div>`;
+      setTimeout(() => {
+        const role = res.data.role;
+        if (role === 'ADMIN' || role === 'TEACHER' || role === 'ACCOUNTANT') window.location.href = 'admin/dashboard.html';
+        else if (role === 'CONTENT_MANAGER') window.location.href = 'admin/posts.html';
+        else window.location.href = 'user/dashboard.html';
+      }, 1000);
+    } catch (err) {
+      alertBox.innerHTML = `<div class="alert alert-error"><i class="fa fa-times-circle"></i> ${err.message}</div>`;
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa fa-user-plus"></i> Đăng ký';
+    }
+  });
+</script>
+</body>
+</html>

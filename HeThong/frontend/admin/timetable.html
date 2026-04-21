@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Thời khóa biểu – TEDU</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand"><span>🎓</span> TEDU Admin</div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Chính</div>
+      <div class="nav-item" onclick="location.href='dashboard.html'"><i class="fa fa-tachometer-alt"></i> Tổng quan</div>
+      <div class="nav-section">Quản lý</div>
+      <div class="nav-item" onclick="location.href='students.html'"><i class="fa fa-user-graduate"></i> Học sinh</div>
+      <div class="nav-item" onclick="location.href='teachers.html'"><i class="fa fa-chalkboard-teacher"></i> Giáo viên</div>
+      <div class="nav-item" onclick="location.href='classes.html'"><i class="fa fa-school"></i> Lớp học</div>
+      <div class="nav-item active" onclick="location.href='timetable.html'"><i class="fa fa-calendar"></i> Thời khóa biểu</div>
+      <div class="nav-item" onclick="location.href='attendance.html'"><i class="fa fa-check-circle"></i> Điểm danh</div>
+      <div class="nav-item" onclick="location.href='posts.html'"><i class="fa fa-video"></i> Bài đăng video</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar"><i class="fa fa-user"></i></div>
+        <div>
+          <div class="user-name" id="sidebar-username">---</div>
+          <div class="user-role" id="sidebar-role">---</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="logout()"><i class="fa fa-sign-out-alt"></i> Đăng xuất</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main-content">
+    <div class="topbar">
+      <div class="topbar-title"><i class="fa fa-calendar-alt"></i> Thời khóa biểu</div>
+    </div>
+    <div class="page-body">
+
+      <div class="card">
+        <div class="card-header">
+          <div class="search-bar" style="margin:0;flex:1">
+            <select id="classSelect" onchange="loadSchedules()" style="max-width:350px; padding:10px 16px; border:1px solid #ddd; border-radius:8px; font-size:0.95rem;">
+              <option value="">🏫  Chọn lớp học để xem thời khóa biểu</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="openModal('schedule-modal')"><i class="fa fa-plus"></i> Thêm lịch học</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Thứ</th>
+                <th>Môn học</th>
+                <th>Thời gian</th>
+                <th>Phòng học</th>
+                <th>Giáo viên</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="scheduleTableBody">
+              <tr><td colspan="7" style="text-align:center;padding:40px;color:#aaa">Chọn lớp để xem thời khóa biểu</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="padding:14px 24px;color:#888;font-size:.85rem" id="table-info"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Add/Edit Schedule -->
+<div class="modal-backdrop" id="schedule-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span id="modal-title">Thêm lịch học</span>
+      <button class="modal-close" onclick="closeModal('schedule-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="modal-alert"></div>
+      <form id="form-schedule">
+        <input type="hidden" id="schedule-id" />
+        <div class="form-grid">
+          <div class="form-group full">
+            <label>Lớp học <span style="color:red">*</span></label>
+            <select id="schedule-classId" required>
+              <option value="">-- Chọn lớp --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Môn học <span style="color:red">*</span></label>
+            <input type="text" id="schedule-subject" placeholder="Toán, Văn, Anh..." required />
+          </div>
+          <div class="form-group">
+            <label>Thứ <span style="color:red">*</span></label>
+            <select id="schedule-dayOfWeek" required>
+              <option value="2">Thứ 2</option>
+              <option value="3">Thứ 3</option>
+              <option value="4">Thứ 4</option>
+              <option value="5">Thứ 5</option>
+              <option value="6">Thứ 6</option>
+              <option value="7">Thứ 7</option>
+              <option value="1">Chủ nhật</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Giờ bắt đầu <span style="color:red">*</span></label>
+            <input type="time" id="schedule-startTime" required />
+          </div>
+          <div class="form-group">
+            <label>Giờ kết thúc <span style="color:red">*</span></label>
+            <input type="time" id="schedule-endTime" required />
+          </div>
+          <div class="form-group">
+            <label>Phòng học</label>
+            <input type="text" id="schedule-room" placeholder="A101, B202..." />
+          </div>
+          <div class="form-group full">
+            <label>Giáo viên</label>
+            <select id="schedule-teacherId">
+              <option value="">-- Chọn giáo viên --</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn-cancel" onclick="closeModal('schedule-modal')">Hủy</button>
+          <button type="submit" class="btn-submit">💾 Lưu</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script>
+  if (!requireAuth()) throw new Error('Unauthorized');
+  renderUserInfo();
+
+  let currentClassId = null;
+
+  async function loadClasses() {
+    try {
+      const resp = await api.classes.getAll();
+      const classes = resp.data;
+      const select = document.getElementById('classSelect');
+      const modalSelect = document.getElementById('schedule-classId');
+      
+      classes.forEach(c => {
+        select.innerHTML += `<option value="${c.id}">${c.className}</option>`;
+        modalSelect.innerHTML += `<option value="${c.id}">${c.className}</option>`;
+      });
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  async function loadTeachers() {
+    try {
+      const resp = await api.teachers.getAll();
+      const teachers = resp.data;
+      const select = document.getElementById('schedule-teacherId');
+      teachers.forEach(t => {
+        select.innerHTML += `<option value="${t.id}">${t.fullName}</option>`;
+      });
+    } catch (err) {
+      console.error('Load teachers error:', err);
+    }
+  }
+
+  async function loadSchedules() {
+    const classId = document.getElementById('classSelect').value;
+    if (!classId) {
+      const tbody = document.getElementById('scheduleTableBody');
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#aaa">Chọn lớp để xem thời khóa biểu</td></tr>';
+      return;
+    }
+
+    currentClassId = classId;
+    try {
+      const resp = await api.schedules.getByClass(classId);
+      const schedules = resp.data;
+
+      // Map day of week from number to Vietnamese
+      const dayNames = {
+        1: 'Chủ nhật',
+        2: 'Thứ 2',
+        3: 'Thứ 3',
+        4: 'Thứ 4',
+        5: 'Thứ 5',
+        6: 'Thứ 6',
+        7: 'Thứ 7'
+      };
+
+      // Sort schedules by day and time
+      schedules.sort((a, b) => {
+        if (a.dayOfWeek !== b.dayOfWeek) {
+          return a.dayOfWeek - b.dayOfWeek;
+        }
+        return a.startTime.localeCompare(b.startTime);
+      });
+
+      const tbody = document.getElementById('scheduleTableBody');
+      tbody.innerHTML = '';
+
+      if (schedules.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" style="text-align: center; padding: 40px; color: #999;">
+              <i class="fa fa-calendar-times" style="font-size: 40px; margin-bottom: 10px;"></i>
+              <p>Chưa có lịch học nào</p>
+            </td>
+          </tr>
+        `;
+      } else {
+        schedules.forEach((s, index) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${index + 1}</td>
+            <td>${dayNames[s.dayOfWeek] || '-'}</td>
+            <td><strong>${s.subject}</strong></td>
+            <td>${s.startTime} - ${s.endTime}</td>
+            <td>${s.room || '-'}</td>
+            <td>${s.teacherName || '-'}</td>
+            <td>
+              <div class="action-btns">
+                <button class="edit-btn" onclick="editSchedule(${s.id})" title="Sửa">
+                  <i class="fa fa-edit"></i>
+                </button>
+                <button class="delete-btn" onclick="deleteSchedule(${s.id})" title="Xóa">
+                  <i class="fa fa-trash"></i>
+                </button>
+              </div>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  async function editSchedule(id) {
+    try {
+      const resp = await api.schedules.getById(id);
+      const s = resp.data;
+      
+      document.getElementById('modal-title').textContent = 'Cập nhật lịch học';
+      document.getElementById('schedule-id').value = s.id;
+      document.getElementById('schedule-classId').value = s.classId;
+      document.getElementById('schedule-subject').value = s.subject;
+      document.getElementById('schedule-dayOfWeek').value = s.dayOfWeek;
+      document.getElementById('schedule-startTime').value = s.startTime;
+      document.getElementById('schedule-endTime').value = s.endTime;
+      document.getElementById('schedule-room').value = s.room || '';
+      document.getElementById('schedule-teacherId').value = s.teacherId || '';
+      
+      openModal('schedule-modal');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  async function deleteSchedule(id) {
+    confirmDelete(async () => {
+      try {
+        await api.schedules.delete(id);
+        showToast('Xóa lịch học thành công');
+        loadSchedules();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+  }
+
+  function openModal(id) {
+    if (id === 'schedule-modal' && !document.getElementById('schedule-id').value) {
+      document.getElementById('modal-title').textContent = 'Thêm lịch học';
+      document.getElementById('form-schedule').reset();
+    }
+    const el = document.getElementById(id);
+    if (el) el.classList.add('show');
+  }
+
+  function closeModal(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('show');
+    document.getElementById('form-schedule').reset();
+    document.getElementById('schedule-id').value = '';
+  }
+
+  document.getElementById('form-schedule').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('schedule-id').value;
+    const data = {
+      classId: parseInt(document.getElementById('schedule-classId').value),
+      subject: document.getElementById('schedule-subject').value.trim(),
+      dayOfWeek: parseInt(document.getElementById('schedule-dayOfWeek').value),
+      startTime: document.getElementById('schedule-startTime').value,
+      endTime: document.getElementById('schedule-endTime').value,
+      room: document.getElementById('schedule-room').value.trim(),
+      teacherId: document.getElementById('schedule-teacherId').value 
+        ? parseInt(document.getElementById('schedule-teacherId').value) : null,
+    };
+
+    try {
+      if (id) {
+        await api.schedules.update(id, data);
+        showToast('Cập nhật lịch học thành công');
+      } else {
+        await api.schedules.create(data);
+        showToast('Thêm lịch học thành công');
+      }
+      closeModal('schedule-modal');
+      loadSchedules();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+  loadClasses();
+  loadTeachers();
+</script>
+</body>
+</html>

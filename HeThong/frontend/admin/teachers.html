@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quản lý giáo viên – TEDU</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand"><span>🎓</span> TEDU Admin</div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Chính</div>
+      <div class="nav-item" onclick="location.href='dashboard.html'"><i class="fa fa-tachometer-alt"></i> Tổng quan</div>
+      <div class="nav-section">Quản lý</div>
+      <div class="nav-item" onclick="location.href='students.html'"><i class="fa fa-user-graduate"></i> Học sinh</div>
+      <div class="nav-item active" onclick="location.href='teachers.html'"><i class="fa fa-chalkboard-teacher"></i> Giáo viên</div>
+      <div class="nav-item" onclick="location.href='classes.html'"><i class="fa fa-school"></i> Lớp học</div>
+      <div class="nav-item" onclick="location.href='timetable.html'"><i class="fa fa-calendar"></i> Thời khóa biểu</div>
+      <div class="nav-item" onclick="location.href='attendance.html'"><i class="fa fa-check-circle"></i> Điểm danh</div>
+      <div class="nav-item" onclick="location.href='posts.html'"><i class="fa fa-video"></i> Bài đăng video</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar"><i class="fa fa-user"></i></div>
+        <div>
+          <div class="user-name" id="sidebar-username">---</div>
+          <div class="user-role" id="sidebar-role">---</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="logout()"><i class="fa fa-sign-out-alt"></i> Đăng xuất</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main-content">
+    <div class="topbar">
+      <div class="topbar-title"><i class="fa fa-chalkboard-teacher"></i> Quản lý giáo viên</div>
+    </div>
+    <div class="page-body">
+      <div class="card">
+        <div class="card-header">
+          <div class="search-bar" style="margin:0;flex:1">
+            <input type="text" id="search-input" placeholder="🔍  Tìm theo tên, môn học..." style="max-width:350px" />
+            <button class="btn btn-outline" onclick="loadTeachers()"><i class="fa fa-search"></i> Tìm</button>
+          </div>
+          <button class="btn btn-primary" id="btn-add" onclick="openAddModal()"><i class="fa fa-plus"></i> Thêm giáo viên</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>#</th><th>Họ tên</th><th>Ngày sinh</th><th>Môn dạy</th><th>SĐT</th><th>Tài khoản</th><th>Thao tác</th></tr>
+            </thead>
+            <tbody id="teachers-table-body"></tbody>
+          </table>
+        </div>
+        <div style="padding:14px 24px;color:#888;font-size:.85rem" id="table-info"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-backdrop" id="teacher-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span id="modal-title">Thêm giáo viên</span>
+      <button class="modal-close" onclick="closeModal('teacher-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="modal-alert"></div>
+      <form id="teacher-form">
+        <input type="hidden" id="teacher-id" />
+        <div class="form-grid">
+          <div class="form-group full">
+            <label>Họ và tên <span style="color:red">*</span></label>
+            <input type="text" id="t-fullName" required />
+          </div>
+          <div class="form-group">
+            <label>Ngày sinh</label>
+            <input type="date" id="t-dob" />
+          </div>
+          <div class="form-group">
+            <label>Giới tính</label>
+            <select id="t-gender">
+              <option value="">-- Chọn --</option>
+              <option>Nam</option><option>Nữ</option><option>Khác</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Số điện thoại</label>
+            <input type="text" id="t-phone" />
+          </div>
+          <div class="form-group">
+            <label>Môn dạy</label>
+            <input type="text" id="t-subject" placeholder="Toán, Lý, Hóa..." />
+          </div>
+          <div class="form-group full">
+            <label>Địa chỉ</label>
+            <input type="text" id="t-address" />
+          </div>
+        </div>
+
+        <div id="account-section" style="margin-top:18px;padding-top:14px;border-top:1px solid #eee">
+          <p style="font-weight:600;font-size:.9rem;margin-bottom:10px"><i class="fa fa-key"></i> Tài khoản đăng nhập (tùy chọn)</p>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Tên đăng nhập</label>
+              <input type="text" id="t-username" />
+            </div>
+            <div class="form-group">
+              <label>Mật khẩu</label>
+              <input type="password" id="t-password" placeholder="Mặc định: teacher123" />
+            </div>
+            <div class="form-group full">
+              <label>Email</label>
+              <input type="email" id="t-email" />
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('teacher-modal')">Hủy</button>
+      <button class="btn btn-primary" onclick="saveTeacher()"><i class="fa fa-save"></i> Lưu</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', async () => {
+    if (!requireAuth()) return;
+    const user = getUser();
+    if (user.role !== 'ADMIN' && user.role !== 'TEACHER') {
+      window.location.href = '../user/dashboard.html'; return;
+    }
+    renderUserInfo();
+    // Non-admin teachers can't add teachers
+    if (!isAdmin()) document.getElementById('btn-add').style.display = 'none';
+    await loadTeachers();
+
+    document.getElementById('search-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') loadTeachers();
+    });
+  });
+
+  async function loadTeachers() {
+    const kw = document.getElementById('search-input').value.trim();
+    try {
+      const res = await api.teachers.getAll(kw);
+      renderTable(res.data);
+    } catch (e) { showToast(e.message, 'error'); }
+  }
+
+  function renderTable(teachers) {
+    const tbody = document.getElementById('teachers-table-body');
+    document.getElementById('table-info').textContent = `Hiển thị ${teachers.length} giáo viên`;
+    if (!teachers.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#aaa;padding:30px">Không có dữ liệu</td></tr>';
+      return;
+    }
+    tbody.innerHTML = teachers.map((t, i) => `
+      <tr>
+        <td>${i+1}</td>
+        <td><strong>${t.fullName}</strong></td>
+        <td>${t.dob ? new Date(t.dob).toLocaleDateString('vi-VN') : '—'}</td>
+        <td><span class="badge badge-info">${t.subject || '—'}</span></td>
+        <td>${t.phone || '—'}</td>
+        <td>${t.username ? `<span class="badge badge-success">${t.username}</span>` : '<span style="color:#aaa">—</span>'}</td>
+        <td>
+          <button class="btn btn-warning btn-sm" onclick="editTeacher(${t.id})"><i class="fa fa-edit"></i></button>
+          ${isAdmin() ? `<button class="btn btn-danger btn-sm" onclick="deleteTeacher(${t.id})" style="margin-left:4px"><i class="fa fa-trash"></i></button>` : ''}
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function openAddModal() {
+    document.getElementById('modal-title').textContent = 'Thêm giáo viên mới';
+    document.getElementById('teacher-form').reset();
+    document.getElementById('teacher-id').value = '';
+    document.getElementById('modal-alert').innerHTML = '';
+    document.getElementById('account-section').style.display = '';
+    openModal('teacher-modal');
+  }
+
+  async function editTeacher(id) {
+    try {
+      const res = await api.teachers.getById(id);
+      const t = res.data;
+      document.getElementById('modal-title').textContent = 'Chỉnh sửa giáo viên';
+      document.getElementById('teacher-id').value = t.id;
+      document.getElementById('t-fullName').value = t.fullName || '';
+      document.getElementById('t-dob').value = t.dob ? t.dob.substring(0,10) : '';
+      document.getElementById('t-gender').value = t.gender || '';
+      document.getElementById('t-phone').value = t.phone || '';
+      document.getElementById('t-subject').value = t.subject || '';
+      document.getElementById('t-address').value = t.address || '';
+      document.getElementById('account-section').style.display = 'none';
+      document.getElementById('modal-alert').innerHTML = '';
+      openModal('teacher-modal');
+    } catch (e) { showToast(e.message, 'error'); }
+  }
+
+  async function saveTeacher() {
+    const id = document.getElementById('teacher-id').value;
+    const payload = {
+      fullName: document.getElementById('t-fullName').value.trim(),
+      dob:      document.getElementById('t-dob').value || null,
+      gender:   document.getElementById('t-gender').value,
+      phone:    document.getElementById('t-phone').value,
+      subject:  document.getElementById('t-subject').value,
+      address:  document.getElementById('t-address').value,
+    };
+    if (!id) {
+      payload.username = document.getElementById('t-username').value.trim() || null;
+      payload.password = document.getElementById('t-password').value || null;
+      payload.email    = document.getElementById('t-email').value.trim() || null;
+    }
+    try {
+      if (id) {
+        await api.teachers.update(id, payload);
+        showToast('Cập nhật giáo viên thành công!');
+      } else {
+        await api.teachers.create(payload);
+        showToast('Thêm giáo viên thành công!');
+      }
+      closeModal('teacher-modal');
+      loadTeachers();
+    } catch (e) {
+      document.getElementById('modal-alert').innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+    }
+  }
+
+  function deleteTeacher(id) {
+    confirmDelete(async () => {
+      try {
+        await api.teachers.delete(id);
+        showToast('Đã xóa giáo viên!');
+        loadTeachers();
+      } catch (e) { showToast(e.message, 'error'); }
+    });
+  }
+</script>
+</body>
+</html>
