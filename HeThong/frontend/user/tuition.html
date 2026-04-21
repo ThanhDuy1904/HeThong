@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Học phí của tôi – TEDU</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <style>
+    .summary-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px; }
+  </style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-brand"><span>🎓</span> TEDU School</div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Menu</div>
+      <div class="nav-item" onclick="location.href='dashboard.html'"><i class="fa fa-home"></i> Trang chủ</div>
+      <div class="nav-item" onclick="location.href='classes.html'"><i class="fa fa-school"></i> Lớp học của tôi</div>
+      <div class="nav-item" onclick="location.href='students.html'"><i class="fa fa-users"></i> Danh sách học sinh</div>
+      <div class="nav-item" onclick="location.href='attendance.html'"><i class="fa fa-clipboard-check"></i> Lịch sử điểm danh</div>
+      <div class="nav-item" onclick="location.href='timetable.html'"><i class="fa fa-calendar"></i> Thời khóa biểu</div>
+      <div class="nav-item active" onclick="location.href='tuition.html'"><i class="fa fa-receipt"></i> Học phí</div>
+      <div class="nav-item" onclick="location.href='../index.html'"><i class="fa fa-video"></i> Bài đăng video</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar"><i class="fa fa-user"></i></div>
+        <div>
+          <div class="user-name" id="sidebar-username">---</div>
+          <div class="user-role" id="sidebar-role">---</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="logout()"><i class="fa fa-sign-out-alt"></i> Đăng xuất</button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <div class="topbar">
+      <div class="topbar-title"><i class="fa fa-receipt"></i> Học phí của tôi</div>
+    </div>
+    <div class="page-body">
+      <div class="card">
+        <div class="card-header"><span>Tổng quan học phí</span></div>
+        <div class="card-body">
+          <div class="summary-grid" id="tuition-summary">
+            <div class="card"><div class="card-body">Đang tải...</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:20px">
+        <div class="card-header"><span>Lịch sử thu/điều chỉnh</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Ngày</th><th>Số tiền</th><th>Số dư sau</th><th>Ghi chú</th><th>Người cập nhật</th></tr>
+            </thead>
+            <tbody id="tuition-history-body"><tr><td colspan="5" style="text-align:center;color:#999;padding:20px">Đang tải...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', async () => {
+    if (!requireAuth()) return;
+    if (getUser()?.role !== 'STUDENT') window.location.href = '../index.html';
+    renderUserInfo();
+    await loadTuition();
+  });
+
+  async function loadTuition() {
+    try {
+      const studentRes = await api.students.getMe();
+      const student = studentRes.data;
+      const paymentsRes = await api.tuitionPayments.getMy();
+      const history = paymentsRes.data || [];
+
+      document.getElementById('tuition-summary').innerHTML = `
+        <div class="card" style="margin:0"><div class="card-body"><strong>${student.className || '—'}</strong><div style="color:#666;font-size:.85rem">Lớp hiện tại</div></div></div>
+        <div class="card" style="margin:0"><div class="card-body"><strong>${formatCurrency(student.classTuitionFee)}</strong><div style="color:#666;font-size:.85rem">Học phí lớp</div></div></div>
+        <div class="card" style="margin:0"><div class="card-body"><strong style="color:#2d9e5c">${formatCurrency(student.tuitionPaidAmount)}</strong><div style="color:#666;font-size:.85rem">Đã đóng</div></div></div>
+        <div class="card" style="margin:0"><div class="card-body"><strong style="color:#f72585">${formatCurrency(student.tuitionRemaining)}</strong><div style="color:#666;font-size:.85rem">Còn lại</div></div></div>
+      `;
+
+      const tbody = document.getElementById('tuition-history-body');
+      if (!history.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#999;padding:20px">Chưa có lịch sử thu học phí</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = history.map(row => `
+        <tr>
+          <td>${formatDate(row.createdAt)}</td>
+          <td><strong style="color:${Number(row.amount) >= 0 ? '#2d9e5c' : '#f44'}">${formatSignedCurrency(row.amount)}</strong></td>
+          <td>${formatCurrency(row.balanceAfter)}</td>
+          <td>${row.note || '—'}</td>
+          <td>${row.createdByName || '—'}</td>
+        </tr>
+      `).join('');
+    } catch (e) {
+      document.getElementById('tuition-history-body').innerHTML = `<tr><td colspan="5" style="text-align:center;color:#f44;padding:20px">${e.message}</td></tr>`;
+    }
+  }
+
+  function formatCurrency(value) {
+    if (value === null || value === undefined || value === '') return '—';
+    const number = Number(value);
+    if (Number.isNaN(number)) return '—';
+    return number.toLocaleString('vi-VN') + ' đ';
+  }
+
+  function formatSignedCurrency(value) {
+    if (value === null || value === undefined || value === '') return '—';
+    const number = Number(value);
+    if (Number.isNaN(number)) return '—';
+    const sign = number > 0 ? '+' : '';
+    return sign + number.toLocaleString('vi-VN') + ' đ';
+  }
+
+  function formatDate(value) {
+    if (!value) return '—';
+    return new Date(value).toLocaleString('vi-VN');
+  }
+</script>
+</body>
+</html>

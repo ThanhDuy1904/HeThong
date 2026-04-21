@@ -8,10 +8,13 @@ public class VideoPostRequest {
     @NotBlank
     private String title;
 
-    @NotBlank
     private String videoUrl;
 
+    private String postType = "ANNOUNCEMENT";
     private String thumbnailUrl;
+    private String category;
     private String content;
     private Boolean published = true;
+    private Boolean pinned = false;
+    private Boolean visible = true;
 }

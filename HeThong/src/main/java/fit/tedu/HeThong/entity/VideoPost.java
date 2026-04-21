@@ -20,11 +20,18 @@ public class VideoPost {
     @Column(nullable = false, length = 200)
     private String title;
 
-    @Column(name = "video_url", nullable = false, length = 500)
+    @Column(name = "post_type", length = 30)
+    @Builder.Default
+    private String postType = "ANNOUNCEMENT";
+
+    @Column(name = "video_url", length = 500)
     private String videoUrl;
 
     @Column(name = "thumbnail_url", length = 500)
     private String thumbnailUrl;
+
+    @Column(length = 100)
+    private String category;
 
     @Column(name = "content", columnDefinition = "TEXT")
     private String content;
@@ -32,6 +39,18 @@ public class VideoPost {
     @Column(nullable = false)
     @Builder.Default
     private boolean published = true;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean pinned = false;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean visible = true;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean deleted = false;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")

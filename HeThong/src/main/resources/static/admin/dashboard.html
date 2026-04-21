@@ -104,6 +104,20 @@
             <div class="label">Tài khoản</div>
           </div>
         </div>
+        <div class="stat-card">
+          <div class="stat-icon bg-green"><i class="fa fa-money-bill-wave"></i></div>
+          <div class="stat-info">
+            <div class="value" id="stat-collected">—</div>
+            <div class="label">Học phí đã thu</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon bg-orange"><i class="fa fa-file-invoice-dollar"></i></div>
+          <div class="stat-info">
+            <div class="value" id="stat-remaining">—</div>
+            <div class="label">Còn phải thu</div>
+          </div>
+        </div>
       </div>
 
       <!-- Recent students -->
@@ -120,6 +134,23 @@
               <tr><th>#</th><th>Họ tên</th><th>Giới tính</th><th>Lớp</th><th>Trạng thái</th></tr>
             </thead>
             <tbody id="recent-students"><tr><td colspan="5" style="text-align:center;color:#aaa">Đang tải...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:20px">
+        <div class="card-header">
+          <span><i class="fa fa-exclamation-circle"></i> Học sinh còn nợ học phí</span>
+          <button class="btn btn-primary btn-sm" onclick="location.href='students.html'">
+            Quản lý học phí <i class="fa fa-arrow-right"></i>
+          </button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>#</th><th>Họ tên</th><th>Lớp</th><th>Học phí lớp</th><th>Đã đóng</th><th>Còn lại</th></tr>
+            </thead>
+            <tbody id="tuition-debt-body"><tr><td colspan="6" style="text-align:center;color:#aaa">Đang tải...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -177,6 +208,8 @@
         document.getElementById('stat-teachers').textContent = d.totalTeachers;
         document.getElementById('stat-classes').textContent  = d.totalClasses;
         document.getElementById('stat-users').textContent    = d.totalUsers;
+        document.getElementById('stat-collected').textContent = formatCurrency(d.tuitionCollected);
+        document.getElementById('stat-remaining').textContent = formatCurrency(d.tuitionRemaining);
       } catch (e) { console.error(e); }
     }
 
@@ -199,7 +232,37 @@
         </tr>
       `).join('');
     } catch (e) { console.error(e); }
+
+    try {
+      const res = await api.students.getAll();
+      const debtors = (res.data || [])
+        .filter(s => Number(s.tuitionRemaining || 0) > 0)
+        .sort((a, b) => Number(b.tuitionRemaining || 0) - Number(a.tuitionRemaining || 0))
+        .slice(0, 8);
+      const tbody = document.getElementById('tuition-debt-body');
+      if (!debtors.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#aaa">Không có học sinh nợ học phí</td></tr>';
+        return;
+      }
+      tbody.innerHTML = debtors.map((s, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><strong>${s.fullName}</strong></td>
+          <td>${s.className || '—'}</td>
+          <td>${formatCurrency(s.classTuitionFee)}</td>
+          <td>${formatCurrency(s.tuitionPaidAmount)}</td>
+          <td><strong style="color:#f44">${formatCurrency(s.tuitionRemaining)}</strong></td>
+        </tr>
+      `).join('');
+    } catch (e) { console.error(e); }
   });
+
+  function formatCurrency(value) {
+    if (value === null || value === undefined || value === '') return '—';
+    const number = Number(value);
+    if (Number.isNaN(number)) return '—';
+    return number.toLocaleString('vi-VN') + ' đ';
+  }
 </script>
 </body>
 </html>

@@ -45,11 +45,31 @@
 
       <div class="card">
         <div class="card-header">
-          <div class="search-bar" style="margin:0;flex:1">
-            <input type="text" id="search-input" placeholder="🔍  Tìm kiếm theo tên, số điện thoại..." style="max-width:350px" />
-            <button class="btn btn-outline" onclick="loadStudents()"><i class="fa fa-search"></i> Tìm</button>
+          <div>
+            <div style="font-weight:600">Chọn lớp để xem danh sách học sinh</div>
+            <div style="color:#777;font-size:.85rem">Màn hình sẽ chỉ hiển thị học sinh sau khi chọn một lớp.</div>
           </div>
           <button class="btn btn-primary" id="btn-add-student" onclick="openAddModal()"><i class="fa fa-plus"></i> Thêm học sinh</button>
+        </div>
+        <div class="card-body" style="padding-bottom:0">
+          <div class="form-group" style="max-width:420px;margin-bottom:16px">
+            <label for="class-select" style="font-weight:600">Chọn lớp</label>
+            <select id="class-select" onchange="handleClassSelect()"></select>
+          </div>
+        </div>
+        <div class="card-body" id="class-browser-body">
+          <div id="class-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px"></div>
+        </div>
+      </div>
+
+      <div class="card" id="student-section" style="display:none;margin-top:20px">
+        <div class="card-header">
+          <div class="search-bar" style="margin:0;flex:1">
+            <input type="text" id="search-input" placeholder="🔍  Tìm kiếm trong lớp đang chọn..." style="max-width:350px" />
+            <button class="btn btn-outline" onclick="filterStudents()"><i class="fa fa-search"></i> Tìm</button>
+            <button class="btn btn-outline" onclick="showClasses()"><i class="fa fa-layer-group"></i> Chọn lớp khác</button>
+          </div>
+          <div id="selected-class-label" style="font-weight:600;color:#334155"></div>
         </div>
         <div class="table-wrap">
           <table>
@@ -124,10 +144,6 @@
             <label>Đã đóng học phí (VNĐ)</label>
             <input type="number" id="s-tuitionPaidAmount" min="0" step="1000" value="0" />
           </div>
-          <div class="form-group" style="display:flex;align-items:center;gap:8px;margin-top:26px">
-            <input type="checkbox" id="s-tuitionPaidFull" onchange="onTuitionPaidFullChange()" />
-            <label for="s-tuitionPaidFull" style="margin:0">Đã đóng đủ học phí</label>
-          </div>
         </div>
 
         <!-- Account creation (only for new) -->
@@ -160,6 +176,9 @@
 <script src="../js/api.js"></script>
 <script>
   let allClasses = [];
+  let currentClassId = null;
+  let currentStudents = [];
+  let savedClassId = localStorage.getItem('student_page_class_id') || '';
 
   document.addEventListener('DOMContentLoaded', async () => {
     if (!requireAuth()) return;
@@ -173,18 +192,18 @@
       if (addBtn) addBtn.style.display = 'none';
     }
     await loadClasses();
-    await loadStudents();
 
     document.getElementById('search-input').addEventListener('keydown', e => {
-      if (e.key === 'Enter') loadStudents();
+      if (e.key === 'Enter') filterStudents();
     });
   });
 
-  async function loadStudents() {
-    const kw = document.getElementById('search-input').value.trim();
+  async function loadStudents(classId = currentClassId) {
+    if (!classId) return;
     try {
-      const res = await api.students.getAll(kw);
-      renderTable(res.data);
+      const res = await api.students.byClass(classId);
+      currentStudents = res.data || [];
+      renderTable(filterStudents(false));
     } catch (e) { showToast(e.message, 'error'); }
   }
 
@@ -192,10 +211,92 @@
     try {
       const res = await api.classes.getAll();
       allClasses = res.data;
+      const classSelect = document.getElementById('class-select');
+      classSelect.innerHTML = '<option value="">-- Chọn lớp --</option>' +
+        allClasses.map(c => `<option value="${c.id}">${c.className}</option>`).join('');
       const sel = document.getElementById('s-classId');
       sel.innerHTML = '<option value="">-- Chọn lớp --</option>' +
         allClasses.map(c => `<option value="${c.id}">${c.className}</option>`).join('');
-    } catch (e) {}
+      renderClassGrid();
+
+      if (savedClassId && allClasses.some(c => String(c.id) === String(savedClassId))) {
+        selectClass(savedClassId);
+      } else if (allClasses.length) {
+        selectClass(allClasses[0].id);
+      }
+    } catch (e) {
+      document.getElementById('class-grid').innerHTML = '<div class="card" style="padding:18px;color:#f44">Không tải được danh sách lớp.</div>';
+    }
+  }
+
+
+  function handleClassSelect() {
+    const classId = document.getElementById('class-select').value;
+    if (!classId) {
+      showClasses();
+      return;
+    }
+    selectClass(classId);
+  }
+  function renderClassGrid() {
+    const grid = document.getElementById('class-grid');
+    if (!allClasses.length) {
+      grid.innerHTML = '<div class="card" style="padding:18px">Không có lớp nào</div>';
+      return;
+    }
+    grid.innerHTML = allClasses.map(c => `
+      <div class="card" style="cursor:pointer;border:1px solid ${String(currentClassId) === String(c.id) ? 'var(--primary)' : '#e5e7eb'}" onclick="selectClass(${c.id})">
+        <div class="card-body">
+          <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+            <div>
+              <div style="font-size:1.05rem;font-weight:700">${c.className}</div>
+              <div style="color:#6b7280;font-size:.85rem">Khối ${c.grade || '—'} · Năm học ${c.schoolYear || '—'}</div>
+            </div>
+            <span class="badge badge-info">${c.studentCount ?? 0} HS</span>
+          </div>
+          <div style="margin-top:12px;color:#555;font-size:.9rem">
+            <div>Học phí: <strong>${formatCurrency(c.tuitionFee)}</strong></div>
+            <div>Giáo viên: ${c.teacherName || '—'}</div>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function selectClass(classId) {
+    currentClassId = classId;
+    savedClassId = String(classId);
+    localStorage.setItem('student_page_class_id', savedClassId);
+    const cls = allClasses.find(c => String(c.id) === String(classId));
+    const classSelect = document.getElementById('class-select');
+    if (classSelect) classSelect.value = String(classId);
+    document.getElementById('selected-class-label').textContent = cls ? `Lớp đang chọn: ${cls.className}` : '';
+    document.getElementById('student-section').style.display = '';
+    loadStudents(classId);
+    renderClassGrid();
+  }
+
+  function showClasses() {
+    currentClassId = null;
+    savedClassId = '';
+    localStorage.removeItem('student_page_class_id');
+    currentStudents = [];
+    document.getElementById('selected-class-label').textContent = '';
+    document.getElementById('student-section').style.display = 'none';
+    document.getElementById('search-input').value = '';
+    const classSelect = document.getElementById('class-select');
+    if (classSelect) classSelect.value = '';
+    renderClassGrid();
+  }
+
+  function filterStudents(render = true) {
+    const kw = document.getElementById('search-input').value.trim().toLowerCase();
+    const filtered = !kw ? currentStudents : currentStudents.filter(s =>
+      (s.fullName || '').toLowerCase().includes(kw) ||
+      (s.phone || '').toLowerCase().includes(kw)
+    );
+    if (render) renderTable(filtered);
+    return filtered;
   }
 
   function renderTable(students) {
@@ -215,10 +316,7 @@
         <td>${s.className || '—'}</td>
         <td>${formatCurrency(s.classTuitionFee)}</td>
         <td>${formatCurrency(s.tuitionPaidAmount)}</td>
-        <td>
-          ${formatCurrency(s.tuitionRemaining)}
-          <div style="margin-top:4px">${s.tuitionPaidFull ? '<span class="badge badge-success">Đã đủ</span>' : '<span class="badge badge-warning">Chưa đủ</span>'}</div>
-        </td>
+        <td>${formatCurrency(s.tuitionRemaining)}</td>
         <td>${s.phone || '—'}</td>
         <td><span class="badge ${s.status === 'ACTIVE' ? 'badge-success' : s.status === 'GRADUATED' ? 'badge-info' : 'badge-danger'}">
           ${s.status === 'ACTIVE' ? 'Đang học' : s.status === 'GRADUATED' ? 'Tốt nghiệp' : 'Nghỉ học'}</span></td>
@@ -232,18 +330,6 @@
   function formatCurrency(v) {
     if (v === null || v === undefined || v === '') return '—';
     return Number(v).toLocaleString('vi-VN') + ' đ';
-  }
-
-  function onTuitionPaidFullChange() {
-    const checked = document.getElementById('s-tuitionPaidFull').checked;
-    const amountInput = document.getElementById('s-tuitionPaidAmount');
-    if (checked) {
-      const classId = document.getElementById('s-classId').value;
-      const cls = allClasses.find(c => String(c.id) === String(classId));
-      if (cls && cls.tuitionFee !== null && cls.tuitionFee !== undefined) {
-        amountInput.value = cls.tuitionFee;
-      }
-    }
   }
 
   function openAddModal() {
@@ -271,7 +357,6 @@
       document.getElementById('s-parentPhone').value = s.parentPhone || '';
       document.getElementById('s-status').value = s.status || 'ACTIVE';
       document.getElementById('s-tuitionPaidAmount').value = s.tuitionPaidAmount || 0;
-      document.getElementById('s-tuitionPaidFull').checked = !!s.tuitionPaidFull;
       document.getElementById('account-section').style.display = 'none';
       document.getElementById('modal-alert').innerHTML = '';
       openModal('student-modal');
@@ -299,7 +384,7 @@
       };
       await api.students.update(id, payload);
       showToast('Cập nhật học phí thành công!');
-      loadStudents();
+      await loadStudents();
     } catch (e) { showToast(e.message, 'error'); }
   }
 
@@ -316,7 +401,7 @@
       parentPhone: document.getElementById('s-parentPhone').value,
       status:      document.getElementById('s-status').value,
       tuitionPaidAmount: document.getElementById('s-tuitionPaidAmount').value || 0,
-      tuitionPaidFull: document.getElementById('s-tuitionPaidFull').checked,
+      tuitionPaidFull: Number(document.getElementById('s-tuitionPaidAmount').value || 0) >= Number((allClasses.find(c => String(c.id) === String(document.getElementById('s-classId').value)) || {}).tuitionFee || 0),
     };
     if (!id) {
       payload.username = document.getElementById('s-username').value.trim() || null;

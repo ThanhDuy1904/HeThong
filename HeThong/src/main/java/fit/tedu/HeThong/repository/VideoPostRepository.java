@@ -6,5 +6,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface VideoPostRepository extends JpaRepository<VideoPost, Long> {
-    List<VideoPost> findByPublishedTrueOrderByCreatedAtDesc();
+    List<VideoPost> findByDeletedFalseAndVisibleTrueOrderByPinnedDescCreatedAtDesc();
+
+    List<VideoPost> findByDeletedFalseOrderByPinnedDescVisibleDescCreatedAtDesc();
+
+    List<VideoPost> findAllByOrderByDeletedAscPinnedDescVisibleDescCreatedAtDesc();
 }

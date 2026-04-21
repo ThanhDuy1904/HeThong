@@ -50,8 +50,17 @@ async function http(method, path, body = null) {
     if (body) options.body = JSON.stringify(body);
 
     const res = await fetch(API_BASE + path, options);
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.message || 'Lỗi server');
+    const text = await res.text();
+    let json = null;
+    try {
+        json = text ? JSON.parse(text) : null;
+    } catch (_) {
+        json = null;
+    }
+    if (!res.ok) {
+        const message = json?.message || json?.error || text || 'Lỗi server';
+        throw new Error(message);
+    }
     return json;
 }
 
@@ -97,11 +106,22 @@ const api = {
 
     posts: {
         getPublished: () => http('GET', '/posts'),
-        getAll:       () => http('GET', '/posts?all=true'),
+        getAll:       (includeDeleted = false) => http('GET', `/posts?all=true${includeDeleted ? '&includeDeleted=true' : ''}`),
         getById:      (id) => http('GET', `/posts/${id}`),
         create:       (data) => http('POST', '/posts', data),
         update:       (id, data) => http('PUT', `/posts/${id}`, data),
         delete:       (id) => http('DELETE', `/posts/${id}`),
+        toggleVisibility: (id) => http('PATCH', `/posts/${id}/visibility`),
+        togglePinned:     (id) => http('PATCH', `/posts/${id}/pinned`),
+        restore:          (id) => http('PATCH', `/posts/${id}/restore`),
+    },
+
+    // Tuition payments
+    tuitionPayments: {
+        getMy:      () => http('GET', '/tuition-payments/me'),
+        getByStudent: (studentId) => http('GET', `/tuition-payments/student/${studentId}`),
+        getByClass: (classId) => http('GET', `/tuition-payments/class/${classId}`),
+        collect: (studentId, data) => http('POST', `/tuition-payments/student/${studentId}/collect`, data),
     },
 
     // Schedules (Lịch học)
@@ -185,8 +205,8 @@ function renderRoleNavigation() {
     const allowedLabels = {
         ADMIN: null,
         TEACHER: ['Học sinh', 'Giáo viên', 'Lớp học', 'Thời khóa biểu', 'Điểm danh', 'Lịch sử điểm danh', 'Tổng quan'],
-        STUDENT: ['Trang chủ', 'Lớp học của tôi', 'Danh sách học sinh', 'Thời khóa biểu', 'Lịch sử điểm danh', 'Bài đăng video'],
-        ACCOUNTANT: ['Học sinh'],
+        STUDENT: ['Trang chủ', 'Lớp học của tôi', 'Danh sách học sinh', 'Thời khóa biểu', 'Lịch sử điểm danh', 'Học phí', 'Bài đăng video'],
+        ACCOUNTANT: ['Học sinh', 'Học phí', 'Tổng quan học phí', 'Tra cứu học phí'],
         CONTENT_MANAGER: ['Bài đăng video'],
     };
 

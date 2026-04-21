@@ -36,6 +36,7 @@
       <div class="nav-item" onclick="location.href='classes.html'"><i class="fa fa-school"></i> Lớp học của tôi</div>
       <div class="nav-item" onclick="location.href='attendance.html'"><i class="fa fa-clipboard-check"></i> Lịch sử điểm danh</div>
       <div class="nav-item" onclick="location.href='timetable.html'"><i class="fa fa-calendar"></i> Thời khóa biểu</div>
+      <div class="nav-item" onclick="location.href='tuition.html'"><i class="fa fa-receipt"></i> Học phí</div>
        <div class="nav-item" onclick="location.href='../index.html'"><i class="fa fa-video"></i> Bài đăng video</div>
     </nav>
     <div class="sidebar-footer">
@@ -102,14 +103,10 @@
         </div>
 
         <div class="card">
-          <div class="card-header"><i class="fa fa-calendar"></i> Lịch học tuần này</div>
-          <div class="card-body">
-            <table style="font-size:.86rem">
-              <tr><th width="80">Thứ</th><th>Buổi sáng</th><th>Buổi chiều</th></tr>
-              <tbody id="schedule-table-body">
-                <tr><td colspan="3" style="text-align:center;padding:20px;color:#999">Đang tải...</td></tr>
-              </tbody>
-            </table>
+          <div class="card-header"><i class="fa fa-calendar"></i> Thời khóa biểu</div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:12px;justify-content:center;height:100%">
+            <p style="margin:0;color:#555">Lịch học được tách sang trang riêng để bạn xem đầy đủ theo từng buổi và từng ngày.</p>
+            <button class="btn btn-primary" onclick="location.href='timetable.html'"><i class="fa fa-arrow-right"></i> Xem thời khóa biểu</button>
           </div>
         </div>
       </div>
@@ -160,85 +157,8 @@
       <div class="info-row"><span class="info-label"><i class="fa fa-shield-alt"></i> Vai trò:</span><span class="info-value"><span class="badge ${user.role === 'ADMIN' ? 'badge-danger' : user.role === 'TEACHER' ? 'badge-warning' : 'badge-success'}">${user.role}</span></span></div>
     `;
 
-    // Load schedule for student
-    loadMySchedule();
     loadAttendanceHistory();
   });
-
-  async function loadMySchedule() {
-    try {
-      const user = getUser();
-      
-      // Get student info to find class
-      const resp = await api.students.getAll();
-      const myStudent = resp.data.find(s => s.userId === user.id);
-
-      if (!myStudent || !myStudent.classId) {
-        document.getElementById('schedule-table-body').innerHTML = `
-          <tr><td colspan="3" style="text-align:center;padding:20px;color:#999">Bạn chưa được phân lớp</td></tr>
-        `;
-        return;
-      }
-
-      // Load schedules for the class
-      const scheduleResp = await api.schedules.getByClass(myStudent.classId);
-      const schedules = scheduleResp.data;
-
-      if (schedules.length === 0) {
-        document.getElementById('schedule-table-body').innerHTML = `
-          <tr><td colspan="3" style="text-align:center;padding:20px;color:#999">Chưa có thời khóa biểu</td></tr>
-        `;
-        return;
-      }
-
-      // Group by day of week and session (morning/afternoon)
-      const dayNames = {
-        2: 'Thứ 2',
-        3: 'Thứ 3',
-        4: 'Thứ 4',
-        5: 'Thứ 5',
-        6: 'Thứ 6',
-        7: 'Thứ 7',
-        1: 'Chủ nhật'
-      };
-
-      const schedulesByDay = {};
-      [2, 3, 4, 5, 6, 7, 1].forEach(day => {
-        schedulesByDay[day] = { morning: [], afternoon: [] };
-      });
-
-      schedules.forEach(s => {
-        const hour = parseInt(s.startTime.split(':')[0]);
-        const session = hour < 12 ? 'morning' : 'afternoon';
-        if (schedulesByDay[s.dayOfWeek]) {
-          schedulesByDay[s.dayOfWeek][session].push(s.subject);
-        }
-      });
-
-      // Render table
-      const tbody = document.getElementById('schedule-table-body');
-      tbody.innerHTML = '';
-
-      [2, 3, 4, 5, 6].forEach(day => { // Only weekdays
-        const morning = schedulesByDay[day].morning.join(', ') || '—';
-        const afternoon = schedulesByDay[day].afternoon.join(', ') || '—';
-        
-        tbody.innerHTML += `
-          <tr>
-            <td><strong>${dayNames[day]}</strong></td>
-            <td>${morning}</td>
-            <td>${afternoon}</td>
-          </tr>
-        `;
-      });
-
-    } catch (err) {
-      console.error('Load schedule error:', err);
-      document.getElementById('schedule-table-body').innerHTML = `
-        <tr><td colspan="3" style="text-align:center;padding:20px;color:#f44">Lỗi tải dữ liệu</td></tr>
-      `;
-    }
-  }
 
   async function loadAttendanceHistory() {
     try {

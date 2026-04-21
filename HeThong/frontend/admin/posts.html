@@ -45,12 +45,16 @@
       <div class="card">
         <div class="card-header">
           <span>Danh sách bài đăng</span>
-          <button class="btn btn-primary" onclick="openAddModal()"><i class="fa fa-plus"></i> Tạo bài đăng</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <button class="btn btn-outline btn-sm" onclick="loadPosts(false)">Đang hiển thị</button>
+            <button class="btn btn-outline btn-sm" onclick="loadPosts(true)">Tất cả</button>
+            <button class="btn btn-primary" onclick="openAddModal()"><i class="fa fa-plus"></i> Tạo bài đăng</button>
+          </div>
         </div>
         <div class="table-wrap">
           <table>
             <thead>
-              <tr><th>#</th><th>Tiêu đề</th><th>Trạng thái</th><th>Người đăng</th><th>Ngày đăng</th><th>Thao tác</th></tr>
+              <tr><th>#</th><th>Tiêu đề</th><th>Loại</th><th>Chuyên mục</th><th>Trạng thái</th><th>Ghim</th><th>Người đăng</th><th>Ngày đăng</th><th>Thao tác</th></tr>
             </thead>
             <tbody id="posts-body"></tbody>
           </table>
@@ -76,8 +80,33 @@
             <input type="text" id="p-title" required />
           </div>
           <div class="form-group">
-            <label>URL video Youtube <span style="color:red">*</span></label>
-            <input type="text" id="p-videoUrl" placeholder="https://www.youtube.com/watch?v=..." required />
+            <label>Loại bài đăng</label>
+            <select id="p-postType" onchange="updateMediaMode()">
+              <option value="ANNOUNCEMENT">Thông báo nội dung</option>
+              <option value="VIDEO">Video</option>
+              <option value="IMAGE">Hình ảnh</option>
+            </select>
+          </div>
+          <div class="form-group" id="media-url-group">
+            <label id="media-url-label">URL media</label>
+            <input type="text" id="p-videoUrl" placeholder="Dán URL video / hình ảnh hoặc tải file bên dưới" oninput="updateMediaPreview()" />
+          </div>
+          <div class="form-group" id="media-file-group">
+            <label>Tải file ảnh / video</label>
+            <input type="file" id="p-mediaFile" accept="image/*,video/*" onchange="handleMediaFile(event)" />
+            <div style="font-size:.82rem;color:#6b7280;margin-top:6px">Có thể dán URL hoặc chọn file từ máy. File sẽ được mã hóa và lưu trực tiếp.</div>
+          </div>
+          <div class="form-group" id="media-preview-group">
+            <label>Xem trước</label>
+            <div id="media-preview" style="border:1px dashed #d7dce3;border-radius:12px;padding:12px;background:#f8fafc;color:#64748b;min-height:72px;display:flex;align-items:center;justify-content:center;text-align:center"></div>
+          </div>
+          <div class="form-group">
+            <label>Thumbnail URL</label>
+            <input type="text" id="p-thumbnailUrl" placeholder="https://..." />
+          </div>
+          <div class="form-group">
+            <label>Chuyên mục</label>
+            <input type="text" id="p-category" placeholder="Thông báo, Tuyển sinh, Hoạt động..." />
           </div>
           <div class="form-group">
             <label>Nội dung mô tả</label>
@@ -88,6 +117,20 @@
             <select id="p-published">
               <option value="true">Hiển thị công khai</option>
               <option value="false">Lưu nháp</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Hiển thị</label>
+            <select id="p-visible">
+              <option value="true">Đang hiển thị</option>
+              <option value="false">Ẩn khỏi trang công khai</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Ghim bài</label>
+            <select id="p-pinned">
+              <option value="false">Không ghim</option>
+              <option value="true">Ghim lên đầu</option>
             </select>
           </div>
         </div>
@@ -102,6 +145,8 @@
 
 <script src="../js/api.js"></script>
 <script>
+  let showDeletedPosts = false;
+
   document.addEventListener('DOMContentLoaded', async () => {
     if (!requireAuth()) return;
     const role = getUser()?.role;
@@ -110,28 +155,42 @@
       return;
     }
     renderUserInfo();
-    await loadPosts();
+    updateMediaMode();
+    await loadPosts(false);
   });
 
-  async function loadPosts() {
+  async function loadPosts(includeDeleted = false) {
+    showDeletedPosts = includeDeleted;
     try {
-      const res = await api.posts.getAll();
+      const res = await api.posts.getAll(includeDeleted);
       const rows = res.data || [];
       const body = document.getElementById('posts-body');
       if (!rows.length) {
-        body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#aaa;padding:24px">Chưa có bài đăng</td></tr>';
+        body.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#aaa;padding:24px">Chưa có bài đăng</td></tr>';
         return;
       }
       body.innerHTML = rows.map((p, i) => `
         <tr>
           <td>${i + 1}</td>
           <td><strong>${p.title}</strong></td>
-          <td><span class="badge ${p.published ? 'badge-success' : 'badge-warning'}">${p.published ? 'Công khai' : 'Nháp'}</span></td>
+          <td>${labelPostType(p.postType)}</td>
+          <td>${p.category || '—'}</td>
+          <td>
+            <span class="badge ${p.deleted ? 'badge-danger' : p.published ? 'badge-success' : 'badge-warning'}">${p.deleted ? 'Đã xóa' : p.published ? 'Công khai' : 'Nháp'}</span>
+            ${!p.visible && !p.deleted ? '<div style="margin-top:4px"><span class="badge badge-info">Đang ẩn</span></div>' : ''}
+          </td>
+          <td>${p.pinned ? '<span class="badge badge-warning">Ghim</span>' : '—'}</td>
           <td>${p.createdByName || '—'}</td>
           <td>${formatDate(p.createdAt)}</td>
           <td>
-            <button class="btn btn-warning btn-sm" onclick="editPost(${p.id})"><i class="fa fa-edit"></i></button>
-            <button class="btn btn-danger btn-sm" onclick="deletePost(${p.id})" style="margin-left:4px"><i class="fa fa-trash"></i></button>
+            ${p.deleted ? `
+              <button class="btn btn-success btn-sm" onclick="restorePost(${p.id})"><i class="fa fa-rotate-left"></i></button>
+            ` : `
+              <button class="btn btn-warning btn-sm" onclick="editPost(${p.id})"><i class="fa fa-edit"></i></button>
+              <button class="btn btn-outline btn-sm" onclick="togglePinned(${p.id})" style="margin-left:4px"><i class="fa fa-thumbtack"></i></button>
+              <button class="btn btn-outline btn-sm" onclick="toggleVisibility(${p.id})" style="margin-left:4px"><i class="fa fa-eye${p.visible ? '-slash' : ''}"></i></button>
+              <button class="btn btn-danger btn-sm" onclick="deletePost(${p.id})" style="margin-left:4px"><i class="fa fa-trash"></i></button>
+            `}
           </td>
         </tr>
       `).join('');
@@ -144,7 +203,15 @@
     document.getElementById('post-modal-title').textContent = 'Tạo bài đăng video';
     document.getElementById('post-form').reset();
     document.getElementById('p-id').value = '';
+    document.getElementById('p-postType').value = 'ANNOUNCEMENT';
     document.getElementById('post-modal-alert').innerHTML = '';
+    document.getElementById('p-thumbnailUrl').value = '';
+    document.getElementById('p-category').value = '';
+    document.getElementById('p-visible').value = 'true';
+    document.getElementById('p-pinned').value = 'false';
+    document.getElementById('p-videoUrl').value = '';
+    document.getElementById('p-mediaFile').value = '';
+    updateMediaMode();
     openModal('post-modal');
   }
 
@@ -155,10 +222,16 @@
       document.getElementById('post-modal-title').textContent = 'Chỉnh sửa bài đăng';
       document.getElementById('p-id').value = p.id;
       document.getElementById('p-title').value = p.title || '';
+      document.getElementById('p-postType').value = p.postType || 'ANNOUNCEMENT';
       document.getElementById('p-videoUrl').value = p.videoUrl || '';
+      document.getElementById('p-thumbnailUrl').value = p.thumbnailUrl || '';
+      document.getElementById('p-category').value = p.category || '';
       document.getElementById('p-content').value = p.content || '';
       document.getElementById('p-published').value = p.published ? 'true' : 'false';
+      document.getElementById('p-visible').value = p.visible ? 'true' : 'false';
+      document.getElementById('p-pinned').value = p.pinned ? 'true' : 'false';
       document.getElementById('post-modal-alert').innerHTML = '';
+      updateMediaMode();
       openModal('post-modal');
     } catch (e) {
       showToast(e.message, 'error');
@@ -169,9 +242,14 @@
     const id = document.getElementById('p-id').value;
     const payload = {
       title: document.getElementById('p-title').value.trim(),
+      postType: document.getElementById('p-postType').value,
       videoUrl: document.getElementById('p-videoUrl').value.trim(),
+      thumbnailUrl: document.getElementById('p-thumbnailUrl').value.trim(),
+      category: document.getElementById('p-category').value.trim(),
       content: document.getElementById('p-content').value.trim(),
-      published: document.getElementById('p-published').value === 'true'
+      published: document.getElementById('p-published').value === 'true',
+      visible: document.getElementById('p-visible').value === 'true',
+      pinned: document.getElementById('p-pinned').value === 'true'
     };
 
     try {
@@ -189,17 +267,146 @@
     }
   }
 
+  function updateMediaMode() {
+    const postType = document.getElementById('p-postType').value;
+    const mediaUrlGroup = document.getElementById('media-url-group');
+    const mediaFileGroup = document.getElementById('media-file-group');
+    const mediaPreviewGroup = document.getElementById('media-preview-group');
+    const mediaLabel = document.getElementById('media-url-label');
+    const mediaInput = document.getElementById('p-videoUrl');
+
+    if (postType === 'ANNOUNCEMENT') {
+      mediaUrlGroup.style.display = 'none';
+      mediaFileGroup.style.display = 'none';
+      mediaPreviewGroup.style.display = '';
+      mediaInput.required = false;
+      mediaInput.value = mediaInput.value || '';
+      renderMediaPreview();
+      return;
+    }
+
+    mediaUrlGroup.style.display = '';
+    mediaFileGroup.style.display = '';
+    mediaPreviewGroup.style.display = '';
+    mediaInput.required = false;
+    mediaLabel.textContent = postType === 'IMAGE' ? 'URL hình ảnh' : 'URL video';
+    mediaInput.placeholder = postType === 'IMAGE'
+      ? 'Dán URL hình ảnh hoặc tải file ảnh bên dưới'
+      : 'Dán URL video hoặc tải file video bên dưới';
+    renderMediaPreview();
+  }
+
+  function handleMediaFile(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      document.getElementById('p-videoUrl').value = reader.result;
+      renderMediaPreview();
+      showToast('Đã nạp file vào nội dung bài đăng');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function renderMediaPreview() {
+    const preview = document.getElementById('media-preview');
+    if (!preview) return;
+    const postType = document.getElementById('p-postType').value;
+    const mediaUrl = document.getElementById('p-videoUrl').value.trim();
+
+    if (postType === 'ANNOUNCEMENT') {
+      preview.innerHTML = '<div><strong>Thông báo nội dung</strong><div style="margin-top:4px">Bài đăng này sẽ hiển thị như một thông báo, không bắt buộc có media.</div></div>';
+      return;
+    }
+
+    if (!mediaUrl) {
+      preview.textContent = postType === 'IMAGE'
+        ? 'Chưa có hình ảnh. Dán URL hoặc chọn file ảnh bên dưới.'
+        : 'Chưa có video. Dán URL hoặc chọn file video bên dưới.';
+      return;
+    }
+
+    if (postType === 'IMAGE' || mediaUrl.startsWith('data:image/')) {
+      preview.innerHTML = `<img src="${mediaUrl}" alt="Xem trước" style="max-width:100%;max-height:220px;border-radius:10px;object-fit:cover">`;
+      return;
+    }
+
+    if (mediaUrl.startsWith('data:video/')) {
+      preview.innerHTML = `<video controls style="width:100%;max-height:220px;border-radius:10px;background:#000"><source src="${mediaUrl}"></video>`;
+      return;
+    }
+
+    if (mediaUrl.includes('youtube.com') || mediaUrl.includes('youtu.be')) {
+      preview.innerHTML = `<iframe src="${normalizeMediaUrl(mediaUrl)}" title="Xem trước video" allowfullscreen style="width:100%;height:220px;border:0;border-radius:10px"></iframe>`;
+      return;
+    }
+
+    preview.innerHTML = `<a href="${mediaUrl}" target="_blank" rel="noopener noreferrer">Mở media đã nhập</a>`;
+  }
+
+  function updateMediaPreview() {
+    renderMediaPreview();
+  }
+
+  function normalizeMediaUrl(url) {
+    if (!url) return '';
+    if (url.includes('youtu.be/')) {
+      const videoId = url.split('youtu.be/')[1].split('?')[0];
+      return `https://www.youtube.com/embed/${videoId}`;
+    }
+    if (url.includes('watch?v=')) {
+      return url.replace('watch?v=', 'embed/');
+    }
+    return url;
+  }
+
+  function labelPostType(value) {
+    if (value === 'VIDEO') return 'Video';
+    if (value === 'IMAGE') return 'Hình ảnh';
+    return 'Thông báo';
+  }
+
   function deletePost(id) {
     confirmDelete(async () => {
       try {
         await api.posts.delete(id);
         showToast('Đã xóa bài đăng');
-        await loadPosts();
+        await loadPosts(showDeletedPosts);
       } catch (e) {
         showToast(e.message, 'error');
       }
     });
   }
+
+    async function toggleVisibility(id) {
+      try {
+        await api.posts.toggleVisibility(id);
+        showToast('Đã cập nhật hiển thị');
+        await loadPosts(showDeletedPosts);
+      } catch (e) {
+        showToast(e.message, 'error');
+      }
+    }
+
+    async function togglePinned(id) {
+      try {
+        await api.posts.togglePinned(id);
+        showToast('Đã cập nhật ghim bài');
+        await loadPosts(showDeletedPosts);
+      } catch (e) {
+        showToast(e.message, 'error');
+      }
+    }
+
+    async function restorePost(id) {
+      try {
+        await api.posts.restore(id);
+        showToast('Đã khôi phục bài đăng');
+        await loadPosts(showDeletedPosts);
+      } catch (e) {
+        showToast(e.message, 'error');
+      }
+    }
 
   function formatDate(v) {
     if (!v) return '—';

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard kế toán – TEDU</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-brand"><span>🎓</span> TEDU Accountant</div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Chính</div>
+      <div class="nav-item active" onclick="location.href='dashboard.html'"><i class="fa fa-money-bill-wave"></i> Tổng quan học phí</div>
+      <div class="nav-item" onclick="location.href='../admin/students.html'"><i class="fa fa-user-graduate"></i> Quản lý học sinh</div>
+      <div class="nav-item" onclick="location.href='../user/tuition.html'"><i class="fa fa-receipt"></i> Tra cứu học phí</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar"><i class="fa fa-user"></i></div>
+        <div>
+          <div class="user-name" id="sidebar-username">---</div>
+          <div class="user-role" id="sidebar-role">---</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="logout()"><i class="fa fa-sign-out-alt"></i> Đăng xuất</button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <div class="topbar">
+      <div class="topbar-title"><i class="fa fa-money-bill-wave"></i> Bảng điều khiển học phí</div>
+      <div class="topbar-actions"><span id="top-username" style="font-size:.9rem;color:#666"></span></div>
+    </div>
+
+    <div class="page-body">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-icon bg-green"><i class="fa fa-money-bill-wave"></i></div><div class="stat-info"><div class="value" id="stat-collected">—</div><div class="label">Đã thu</div></div></div>
+        <div class="stat-card"><div class="stat-icon bg-orange"><i class="fa fa-file-invoice-dollar"></i></div><div class="stat-info"><div class="value" id="stat-remaining">—</div><div class="label">Còn phải thu</div></div></div>
+        <div class="stat-card"><div class="stat-icon bg-blue"><i class="fa fa-user-clock"></i></div><div class="stat-info"><div class="value" id="stat-pending">—</div><div class="label">Học sinh còn nợ</div></div></div>
+        <div class="stat-card"><div class="stat-icon bg-purple"><i class="fa fa-check-circle"></i></div><div class="stat-info"><div class="value" id="stat-paid">—</div><div class="label">Đã đóng đủ</div></div></div>
+      </div>
+
+      <div class="card" style="margin-top:20px">
+        <div class="card-header">
+          <span><i class="fa fa-table"></i> Công nợ theo lớp</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <select id="class-filter" style="min-width:220px" onchange="loadDebtTable()">
+              <option value="">Tất cả lớp</option>
+            </select>
+            <button class="btn btn-outline btn-sm" onclick="loadDebtTable()"><i class="fa fa-sync"></i> Tải lại</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>#</th><th>Họ tên</th><th>Lớp</th><th>Học phí lớp</th><th>Đã đóng</th><th>Còn lại</th><th>Thao tác</th></tr>
+            </thead>
+            <tbody id="debt-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="collect-modal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <span>Thu học phí</span>
+      <button class="modal-close" onclick="closeModal('collect-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="collect-alert"></div>
+      <div style="margin-bottom:12px;color:#555">
+        <div><strong>Học sinh:</strong> <span id="collect-student-name">—</span></div>
+        <div><strong>Lớp:</strong> <span id="collect-class-name">—</span></div>
+        <div><strong>Còn lại:</strong> <span id="collect-remaining">—</span></div>
+      </div>
+      <div class="form-grid single">
+        <div class="form-group">
+          <label>Số tiền thu <span style="color:red">*</span></label>
+          <input type="number" id="collect-amount" min="1" step="1000" />
+        </div>
+        <div class="form-group">
+          <label>Ghi chú</label>
+          <textarea id="collect-note" rows="3" placeholder="Ví dụ: Thu đợt 1"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('collect-modal')">Hủy</button>
+      <button class="btn btn-primary" onclick="submitCollect()"><i class="fa fa-check"></i> Xác nhận thu</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script>
+  let collectStudentId = null;
+  let selectedClassId = localStorage.getItem('accountant_class_filter') || '';
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    if (!requireAuth()) return;
+    if (getUser()?.role !== 'ACCOUNTANT') window.location.href = '../user/dashboard.html';
+    renderUserInfo();
+    document.getElementById('top-username').textContent = getUser().fullName || getUser().username;
+    await loadClassFilter();
+    document.getElementById('class-filter').value = selectedClassId;
+    await loadStats();
+    await loadDebtTable();
+  });
+
+  async function loadClassFilter() {
+    try {
+      const res = await api.classes.getAll();
+      const classes = res.data || [];
+      const filter = document.getElementById('class-filter');
+      filter.innerHTML = '<option value="">Tất cả lớp</option>' + classes.map(c => `<option value="${c.id}">${c.className}</option>`).join('');
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }
+
+  async function loadStats() {
+    try {
+      const res = await api.dashboard();
+      const d = res.data || {};
+      document.getElementById('stat-collected').textContent = formatCurrency(d.tuitionCollected);
+      document.getElementById('stat-remaining').textContent = formatCurrency(d.tuitionRemaining);
+      document.getElementById('stat-pending').textContent = d.tuitionPendingStudents ?? '—';
+      document.getElementById('stat-paid').textContent = d.tuitionPaidStudents ?? '—';
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }
+
+  async function loadDebtTable() {
+    try {
+      selectedClassId = document.getElementById('class-filter').value;
+      localStorage.setItem('accountant_class_filter', selectedClassId);
+      const classId = selectedClassId;
+      const res = classId ? await api.students.byClass(classId) : await api.students.getAll();
+      const students = (res.data || [])
+        .filter(s => Number(s.tuitionRemaining || 0) > 0)
+        .sort((a, b) => Number(b.tuitionRemaining || 0) - Number(a.tuitionRemaining || 0));
+      const tbody = document.getElementById('debt-table-body');
+      if (!students.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#aaa;padding:24px">Không có công nợ</td></tr>';
+        return;
+      }
+      tbody.innerHTML = students.map((s, i) => `
+        <tr data-id="${s.id}" data-name="${encodeURIComponent(s.fullName || '')}" data-class-name="${encodeURIComponent(s.className || '—')}" data-remaining="${s.tuitionRemaining || 0}">
+          <td>${i + 1}</td>
+          <td><strong>${s.fullName}</strong></td>
+          <td>${s.className || '—'}</td>
+          <td>${formatCurrency(s.classTuitionFee)}</td>
+          <td>${formatCurrency(s.tuitionPaidAmount)}</td>
+          <td><strong style="color:#f44">${formatCurrency(s.tuitionRemaining)}</strong></td>
+          <td><button class="btn btn-primary btn-sm" onclick="openCollectModal(this)"><i class="fa fa-hand-holding-dollar"></i> Thu tiền</button></td>
+        </tr>
+      `).join('');
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }
+
+  function openCollectModal(button) {
+    const row = button.closest('tr');
+    collectStudentId = Number(row.dataset.id);
+    const studentName = decodeURIComponent(row.dataset.name || '');
+    const className = decodeURIComponent(row.dataset.className || '—');
+    const remaining = Number(row.dataset.remaining || 0);
+    document.getElementById('collect-student-name').textContent = studentName || '—';
+    document.getElementById('collect-class-name').textContent = className || '—';
+    document.getElementById('collect-remaining').textContent = formatCurrency(remaining);
+    document.getElementById('collect-amount').value = remaining;
+    document.getElementById('collect-note').value = '';
+    document.getElementById('collect-alert').innerHTML = '';
+    openModal('collect-modal');
+  }
+
+  async function submitCollect() {
+    if (!collectStudentId) return;
+    const amount = Number(document.getElementById('collect-amount').value || 0);
+    const note = document.getElementById('collect-note').value.trim();
+    try {
+      await api.tuitionPayments.collect(collectStudentId, { amount, note });
+      showToast('Đã ghi nhận thu học phí');
+      closeModal('collect-modal');
+      await loadStats();
+      await loadDebtTable();
+    } catch (e) {
+      document.getElementById('collect-alert').innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+    }
+  }
+
+  function formatCurrency(value) {
+    if (value === null || value === undefined || value === '') return '—';
+    const number = Number(value);
+    if (Number.isNaN(number)) return '—';
+    return number.toLocaleString('vi-VN') + ' đ';
+  }
+</script>
+</body>
+</html>

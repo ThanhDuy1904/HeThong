@@ -70,7 +70,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/posts/**").permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 // Admin-only endpoints
-                .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
+                .requestMatchers("/api/admin/**").hasAnyAuthority("ADMIN","ACCOUNTANT")
                 // Students - Only admin and teacher can view list, students cannot
                 .requestMatchers(HttpMethod.GET, "/api/students/me").authenticated() // Students can view their own info
                 .requestMatchers(HttpMethod.GET, "/api/students").hasAnyAuthority("ADMIN","TEACHER","STUDENT","ACCOUNTANT")
@@ -85,11 +85,17 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.PUT,    "/api/teachers/**").hasAnyAuthority("ADMIN","TEACHER")
                 .requestMatchers(HttpMethod.DELETE, "/api/teachers/**").hasAuthority("ADMIN")
                 // Classes - Teacher and Admin can view, only Admin can modify
-                .requestMatchers(HttpMethod.GET, "/api/classes/**").hasAnyAuthority("ADMIN","TEACHER","STUDENT")
+                .requestMatchers(HttpMethod.GET, "/api/classes/**").hasAnyAuthority("ADMIN","TEACHER","STUDENT","ACCOUNTANT")
                 .requestMatchers(HttpMethod.POST,   "/api/classes").hasAuthority("ADMIN")
                 .requestMatchers(HttpMethod.PUT,    "/api/classes/*/tuition-fee").hasAnyAuthority("ADMIN","ACCOUNTANT")
                 .requestMatchers(HttpMethod.PUT,    "/api/classes/**").hasAuthority("ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/api/classes/**").hasAuthority("ADMIN")
+                // Tuition payments - students view own history, accountant/admin manage class histories
+                .requestMatchers(HttpMethod.GET, "/api/tuition-payments/me").hasAnyAuthority("STUDENT")
+                .requestMatchers(HttpMethod.GET, "/api/tuition-payments/student/**").hasAnyAuthority("ADMIN","ACCOUNTANT","STUDENT")
+                .requestMatchers(HttpMethod.GET, "/api/tuition-payments/class/**").hasAnyAuthority("ADMIN","ACCOUNTANT")
+                .requestMatchers(HttpMethod.POST, "/api/tuition-payments/student/*/collect").hasAnyAuthority("ADMIN","ACCOUNTANT")
+                .requestMatchers(HttpMethod.GET, "/api/tuition-payments/**").authenticated()
                 // Video posts
                 .requestMatchers(HttpMethod.POST, "/api/posts/**").hasAnyAuthority("ADMIN","CONTENT_MANAGER")
                 .requestMatchers(HttpMethod.PUT, "/api/posts/**").hasAnyAuthority("ADMIN","CONTENT_MANAGER")

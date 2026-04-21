@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Thời khóa biểu của tôi – TEDU</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <style>
+    .schedule-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+    .schedule-card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      overflow: hidden;
+      transition: transform 0.2s;
+    }
+    .schedule-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    }
+    .schedule-card-header {
+      padding: 14px 18px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      font-weight: 600;
+      text-align: center;
+    }
+    .schedule-card-body { padding: 16px; }
+    .schedule-slot {
+      background: #f8f9fa;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      border-left: 4px solid var(--primary);
+    }
+    .schedule-slot:last-child { margin-bottom: 0; }
+    .slot-subject { font-weight: 700; font-size: 1.05rem; margin-bottom: 6px; color: #333; }
+    .slot-detail {
+      font-size: 0.85rem;
+      color: #666;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+    .empty-schedule { text-align: center; padding: 30px; color: #aaa; }
+  </style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-brand"><span>🎓</span> TEDU Teacher</div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Chính</div>
+      <div class="nav-item" onclick="location.href='attendance.html'"><i class="fa fa-clipboard-check"></i> Điểm danh</div>
+      <div class="nav-item" onclick="location.href='classes.html'"><i class="fa fa-school"></i> Lớp học của tôi</div>
+      <div class="nav-item" onclick="location.href='students.html'"><i class="fa fa-user-graduate"></i> Học sinh của tôi</div>
+      <div class="nav-item active" onclick="location.href='timetable.html'"><i class="fa fa-calendar"></i> Thời khóa biểu</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar"><i class="fa fa-user"></i></div>
+        <div>
+          <div class="user-name" id="sidebar-username">---</div>
+          <div class="user-role" id="sidebar-role">---</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="logout()"><i class="fa fa-sign-out-alt"></i> Đăng xuất</button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <div class="topbar">
+      <div class="topbar-title"><i class="fa fa-calendar-alt"></i> Thời khóa biểu của tôi</div>
+    </div>
+    <div class="page-body">
+      <div class="card" style="margin-bottom:24px">
+        <div class="card-header">
+          <i class="fa fa-graduation-cap"></i> Lịch dạy cá nhân
+        </div>
+      </div>
+
+      <div class="schedule-grid" id="scheduleGrid">
+        <div style="text-align:center;color:#aaa;padding:40px;grid-column:1/-1">Đang tải...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', async () => {
+    if (!requireAuth()) return;
+    if (getUser()?.role !== 'TEACHER') window.location.href = '../user/dashboard.html';
+    renderUserInfo();
+    await loadMySchedule();
+  });
+
+  async function loadMySchedule() {
+    try {
+      const resp = await api.schedules.getMy();
+      const schedules = resp.data || [];
+
+      const days = [
+        { value: 2, name: 'Thứ 2' },
+        { value: 3, name: 'Thứ 3' },
+        { value: 4, name: 'Thứ 4' },
+        { value: 5, name: 'Thứ 5' },
+        { value: 6, name: 'Thứ 6' },
+        { value: 7, name: 'Thứ 7' },
+        { value: 1, name: 'Chủ nhật' }
+      ];
+
+      const schedulesByDay = {};
+      days.forEach(d => schedulesByDay[d.value] = []);
+      schedules.forEach(s => {
+        if (schedulesByDay[s.dayOfWeek]) schedulesByDay[s.dayOfWeek].push(s);
+      });
+
+      const grid = document.getElementById('scheduleGrid');
+      grid.innerHTML = '';
+
+      if (!schedules.length) {
+        grid.innerHTML = '<div style="text-align:center;color:#aaa;padding:40px;grid-column:1/-1">Chưa có thời khóa biểu</div>';
+        return;
+      }
+
+      days.forEach(day => {
+        const daySchedules = schedulesByDay[day.value];
+        const card = document.createElement('div');
+        card.className = 'schedule-card';
+
+        let bodyContent = '';
+        if (daySchedules.length === 0) {
+          bodyContent = '<div class="empty-schedule"><i class="fa fa-coffee"></i><p>Không có lịch dạy</p></div>';
+        } else {
+          daySchedules.sort((a, b) => a.startTime.localeCompare(b.startTime));
+          bodyContent = daySchedules.map(s => `
+            <div class="schedule-slot">
+              <div class="slot-subject"><i class="fa fa-book"></i> ${s.subject}</div>
+              <div class="slot-detail"><i class="fa fa-clock"></i> ${s.startTime} - ${s.endTime}</div>
+              <div class="slot-detail"><i class="fa fa-school"></i> ${s.className || 'Chưa xác định'}</div>
+              <div class="slot-detail"><i class="fa fa-door-open"></i> ${s.room || 'Chưa xác định'}</div>
+            </div>
+          `).join('');
+        }
+
+        card.innerHTML = `
+          <div class="schedule-card-header">${day.name}</div>
+          <div class="schedule-card-body">${bodyContent}</div>
+        `;
+
+        grid.appendChild(card);
+      });
+    } catch (err) {
+      console.error('Load schedules error:', err);
+      document.getElementById('scheduleGrid').innerHTML = '<div style="text-align:center;color:#f44;padding:40px;grid-column:1/-1">Lỗi tải thời khóa biểu</div>';
+    }
+  }
+</script>
+</body>
+</html>

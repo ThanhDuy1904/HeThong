@@ -122,13 +122,40 @@ CREATE TABLE IF NOT EXISTS attendances (
 CREATE TABLE IF NOT EXISTS video_posts (
     id            BIGINT AUTO_INCREMENT PRIMARY KEY,
     title         VARCHAR(200) NOT NULL,
-    video_url     VARCHAR(500) NOT NULL,
+    post_type     VARCHAR(30) DEFAULT 'ANNOUNCEMENT',
+    video_url     VARCHAR(500),
     thumbnail_url VARCHAR(500),
+    category      VARCHAR(100),
     content       TEXT,
     published     TINYINT(1) DEFAULT 1,
+    pinned        TINYINT(1) DEFAULT 0,
+    visible       TINYINT(1) DEFAULT 1,
+    deleted       TINYINT(1) DEFAULT 0,
     created_by    BIGINT,
     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_video_post_user FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+ALTER TABLE video_posts
+    ADD COLUMN IF NOT EXISTS post_type VARCHAR(30) DEFAULT 'ANNOUNCEMENT',
+    ADD COLUMN IF NOT EXISTS category VARCHAR(100),
+    ADD COLUMN IF NOT EXISTS pinned TINYINT(1) DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS visible TINYINT(1) DEFAULT 1,
+    ADD COLUMN IF NOT EXISTS deleted TINYINT(1) DEFAULT 0;
+
+-- ----------------------------------------------------------------
+-- Table: tuition_payments
+-- ----------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS tuition_payments (
+    id            BIGINT AUTO_INCREMENT PRIMARY KEY,
+    student_id    BIGINT NOT NULL,
+    created_by    BIGINT,
+    amount        DECIMAL(15,2) NOT NULL,
+    balance_after DECIMAL(15,2),
+    note          VARCHAR(500),
+    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_tuition_payment_student FOREIGN KEY (student_id) REFERENCES students(id),
+    CONSTRAINT fk_tuition_payment_user FOREIGN KEY (created_by) REFERENCES users(id)
 );
 
 -- ----------------------------------------------------------------
@@ -197,12 +224,23 @@ VALUES (
     (SELECT id FROM roles WHERE name = 'CONTENT_MANAGER')
 );
 
-INSERT IGNORE INTO video_posts (title, video_url, thumbnail_url, content, published, created_by)
+INSERT IGNORE INTO video_posts (title, post_type, video_url, thumbnail_url, content, published, created_by)
 VALUES (
     'Giới thiệu chương trình học TEDU',
+    'VIDEO',
     'https://www.youtube.com/embed/dQw4w9WgXcQ',
     'https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg',
     'Video giới thiệu tổng quan chương trình học dành cho học sinh và phụ huynh.',
+    1,
+    (SELECT id FROM users WHERE username = 'admin')
+);
+
+INSERT IGNORE INTO video_posts (title, post_type, video_url, content, published, created_by)
+VALUES (
+    'Thông báo nghỉ lễ',
+    'ANNOUNCEMENT',
+    NULL,
+    'Nhà trường nghỉ lễ vào ngày 30/04 và 01/05. Học sinh nghỉ học theo lịch chung của trường.',
     1,
     (SELECT id FROM users WHERE username = 'admin')
 );
@@ -227,6 +265,20 @@ VALUES (
     '0912345678',
     'Trần Văn C',
     '0987654321'
+);
+
+UPDATE students
+SET tuition_paid_amount = 500000,
+    tuition_paid_full = 0
+WHERE user_id = (SELECT id FROM users WHERE username = 'hocsinh');
+
+INSERT INTO tuition_payments (student_id, created_by, amount, balance_after, note)
+VALUES (
+    (SELECT id FROM students WHERE full_name = 'Thanh Duy1'),
+    (SELECT id FROM users WHERE username = 'ketoan01'),
+    500000,
+    2000000,
+    'Thu học phí đợt 1'
 );
 
 -- Sample schedules for class 10A1

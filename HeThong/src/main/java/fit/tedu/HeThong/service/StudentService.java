@@ -22,6 +22,7 @@ public class StudentService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final TuitionPaymentService tuitionPaymentService;
 
     public List<StudentResponse> getAll() {
         return studentRepository.findAll().stream().map(this::toResponse).collect(Collectors.toList());
@@ -77,7 +78,12 @@ public class StudentService {
             student.setUser(user);
         }
 
-        return toResponse(studentRepository.save(student));
+        Student saved = studentRepository.save(student);
+        if (saved.getTuitionPaidAmount() != null && saved.getTuitionPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
+            tuitionPaymentService.recordPaymentChange(saved.getId(), saved.getTuitionPaidAmount(),
+                toResponse(saved).getTuitionRemaining(), "Khởi tạo học phí", null);
+        }
+        return toResponse(saved);
     }
 
     @Transactional
@@ -85,6 +91,7 @@ public class StudentService {
         Student student = studentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy học sinh!"));
 
+        BigDecimal oldPaid = student.getTuitionPaidAmount() != null ? student.getTuitionPaidAmount() : BigDecimal.ZERO;
         student.setFullName(req.getFullName());
         student.setDob(req.getDob());
         student.setGender(req.getGender());
@@ -108,7 +115,14 @@ public class StudentService {
             userRepository.save(user);
         }
 
-        return toResponse(studentRepository.save(student));
+        Student saved = studentRepository.save(student);
+        BigDecimal newPaid = saved.getTuitionPaidAmount() != null ? saved.getTuitionPaidAmount() : BigDecimal.ZERO;
+        BigDecimal delta = newPaid.subtract(oldPaid);
+        if (delta.compareTo(BigDecimal.ZERO) != 0) {
+            tuitionPaymentService.recordPaymentChange(saved.getId(), delta, toResponse(saved).getTuitionRemaining(),
+                "Cập nhật học phí", null);
+        }
+        return toResponse(saved);
     }
 
     @Transactional
@@ -157,6 +171,12 @@ public class StudentService {
         BigDecimal classFee = student.getClassRoom() != null && student.getClassRoom().getTuitionFee() != null
                 ? student.getClassRoom().getTuitionFee()
                 : BigDecimal.ZERO;
+
+        if (classFee.compareTo(BigDecimal.ZERO) <= 0) {
+            student.setTuitionPaidAmount(paid);
+            student.setTuitionPaidFull(student.isTuitionPaidFull() && paid.compareTo(BigDecimal.ZERO) > 0);
+            return;
+        }
 
         if (student.isTuitionPaidFull()) {
             student.setTuitionPaidAmount(classFee);

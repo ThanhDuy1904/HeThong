@@ -4,6 +4,7 @@ import fit.tedu.HeThong.entity.Student;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -14,6 +15,16 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
     Optional<Student> findByUsername(@Param("username") String username);
     
     List<Student> findByClassRoomId(Long classId);
+
+    long countByTuitionPaidFullTrue();
+
+    long countByTuitionPaidFullFalse();
+
+    @Query("SELECT COALESCE(SUM(CASE WHEN s.classRoom IS NOT NULL AND s.classRoom.tuitionFee IS NOT NULL THEN s.classRoom.tuitionFee ELSE 0 END - CASE WHEN s.tuitionPaidAmount IS NOT NULL THEN s.tuitionPaidAmount ELSE 0 END), 0) FROM Student s")
+    BigDecimal sumTuitionRemaining();
+
+    @Query("SELECT COALESCE(SUM(CASE WHEN s.tuitionPaidAmount IS NOT NULL THEN s.tuitionPaidAmount ELSE 0 END), 0) FROM Student s")
+    BigDecimal sumTuitionPaid();
 
     @Query("SELECT s FROM Student s WHERE " +
            "LOWER(s.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
