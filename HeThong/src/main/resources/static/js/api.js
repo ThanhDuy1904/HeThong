@@ -78,6 +78,7 @@ const api = {
     // Teachers
     teachers: {
         getAll:  (kw = '') => http('GET', `/teachers${kw ? '?keyword='+encodeURIComponent(kw) : ''}`),
+        getMe:   ()        => http('GET', '/teachers/me'),
         getById: (id)      => http('GET', `/teachers/${id}`),
         create:  (data)    => http('POST', '/teachers', data),
         update:  (id, data)=> http('PUT', `/teachers/${id}`, data),
@@ -174,4 +175,37 @@ function renderUserInfo() {
     const roleEl = document.getElementById('sidebar-role');
     if (nameEl) nameEl.textContent = user.fullName || user.username;
     if (roleEl) roleEl.textContent = user.role;
+    renderRoleNavigation();
+}
+
+function renderRoleNavigation() {
+    const role = getUser()?.role;
+    if (!role) return;
+
+    const allowedLabels = {
+        ADMIN: null,
+        TEACHER: ['Học sinh', 'Giáo viên', 'Lớp học', 'Thời khóa biểu', 'Điểm danh', 'Lịch sử điểm danh', 'Tổng quan'],
+        STUDENT: ['Trang chủ', 'Lớp học của tôi', 'Danh sách học sinh', 'Thời khóa biểu', 'Lịch sử điểm danh', 'Bài đăng video'],
+        ACCOUNTANT: ['Học sinh'],
+        CONTENT_MANAGER: ['Bài đăng video'],
+    };
+
+    const allowed = allowedLabels[role];
+    if (!allowed) return;
+
+    document.querySelectorAll('.sidebar-nav .nav-item').forEach(item => {
+        const label = item.textContent.replace(/\s+/g, ' ').trim();
+        const visible = allowed.some(a => label.includes(a));
+        item.style.display = visible ? '' : 'none';
+    });
+
+    document.querySelectorAll('.sidebar-nav .nav-section').forEach(section => {
+        const nextItems = [];
+        let node = section.nextElementSibling;
+        while (node && !node.classList.contains('nav-section')) {
+            if (node.classList.contains('nav-item')) nextItems.push(node);
+            node = node.nextElementSibling;
+        }
+        section.style.display = nextItems.some(el => el.style.display !== 'none') ? '' : 'none';
+    });
 }

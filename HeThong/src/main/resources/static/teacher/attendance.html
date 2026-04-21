@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Điểm danh giáo viên – TEDU</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <style>
+    .stats-bar { display: flex; gap: 16px; flex-wrap: wrap; }
+    .stat-card { flex: 1; min-width: 150px; padding: 20px; border-radius: 12px; color: #fff; display: flex; align-items: center; gap: 16px; box-shadow: 0 3px 10px rgba(0,0,0,0.1); }
+    .stat-card.total { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .stat-card.present { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+    .stat-card.absent { background: linear-gradient(135deg, #f72585 0%, #b967ff 100%); }
+    .stat-card.late { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+    .student-card { background: #f8f9fa; border-radius: 10px; padding: 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 16px; transition: all 0.2s; border: 1px solid #e9ecef; }
+    .student-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); transform: translateY(-2px); }
+    .student-avatar { width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.2rem; font-weight: 700; flex-shrink: 0; }
+    .student-name { flex: 1; font-weight: 600; font-size: 1rem; color: #333; }
+    .status-group { display: flex; gap: 8px; flex-wrap: wrap; }
+    .status-btn { padding: 8px 16px; border: 2px solid #e0e0e0; background: #fff; border-radius: 6px; cursor: pointer; transition: all 0.2s; font-weight: 600; font-size: 0.85rem; display: flex; align-items: center; gap: 5px; }
+    .status-btn.active { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(0,0,0,0.15); }
+    .status-btn.present.active { background: #43e97b; color: #fff; border-color: #43e97b; }
+    .status-btn.absent.active { background: #f72585; color: #fff; border-color: #f72585; }
+    .status-btn.late.active { background: #ff9500; color: #fff; border-color: #ff9500; }
+    .save-section { padding: 20px 24px; border-top: 1px solid #f0f0f0; background: #f8f9fa; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+    .empty-state { text-align: center; padding: 60px 20px; color: #aaa; }
+    .empty-state i { font-size: 4rem; margin-bottom: 16px; opacity: 0.3; }
+    .empty-state h3 { margin: 0 0 8px 0; color: #999; font-size: 1.1rem; }
+  </style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-brand"><span>🎓</span> TEDU Teacher</div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Chính</div>
+      <div class="nav-item active" onclick="location.href='attendance.html'"><i class="fa fa-clipboard-check"></i> Điểm danh</div>
+      <div class="nav-item" onclick="location.href='classes.html'"><i class="fa fa-school"></i> Lớp học của tôi</div>
+      <div class="nav-item" onclick="location.href='students.html'"><i class="fa fa-user-graduate"></i> Học sinh của tôi</div>
+      <div class="nav-item" onclick="location.href='../admin/timetable.html'"><i class="fa fa-calendar"></i> Thời khóa biểu</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar"><i class="fa fa-user"></i></div>
+        <div>
+          <div class="user-name" id="sidebar-username">---</div>
+          <div class="user-role" id="sidebar-role">---</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="logout()"><i class="fa fa-sign-out-alt"></i> Đăng xuất</button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <div class="topbar">
+      <div class="topbar-title"><i class="fa fa-clipboard-check"></i> Điểm danh học sinh</div>
+    </div>
+    <div class="page-body">
+      <div class="card">
+        <div class="card-header">
+          <div style="display:flex;gap:16px;flex:1;flex-wrap:wrap;align-items:flex-end">
+            <div style="flex:1;min-width:200px">
+              <label style="display:block;margin-bottom:6px;font-weight:600;font-size:0.9rem"><i class="fa fa-school"></i> Lớp học</label>
+              <select id="classSelect" onchange="loadSchedules()" style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:0.95rem">
+                <option value="">-- Chọn lớp --</option>
+              </select>
+            </div>
+            <div style="flex:1;min-width:200px">
+              <label style="display:block;margin-bottom:6px;font-weight:600;font-size:0.9rem"><i class="fa fa-book-open"></i> Buổi học</label>
+              <select id="scheduleSelect" onchange="loadStudents()" disabled style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:0.95rem">
+                <option value="">-- Chọn buổi học --</option>
+              </select>
+            </div>
+            <div style="flex:1;min-width:200px">
+              <label style="display:block;margin-bottom:6px;font-weight:600;font-size:0.9rem"><i class="fa fa-calendar"></i> Ngày điểm danh</label>
+              <input type="date" id="attendanceDate" onchange="loadExistingAttendance()" style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:0.95rem" />
+            </div>
+          </div>
+        </div>
+
+        <div id="attendanceContainer" style="display:none;">
+          <div class="stats-bar" id="statsBar" style="padding:20px 24px;border-bottom:1px solid #f0f0f0">
+            <div class="stat-card total"><div class="fa fa-users stat-icon"></div><div><h4>Tổng số</h4><p class="stat-number" id="totalCount">0</p></div></div>
+            <div class="stat-card present"><div class="fa fa-check-circle stat-icon"></div><div><h4>Có mặt</h4><p class="stat-number" id="presentCount">0</p></div></div>
+            <div class="stat-card absent"><div class="fa fa-times-circle stat-icon"></div><div><h4>Vắng</h4><p class="stat-number" id="absentCount">0</p></div></div>
+            <div class="stat-card late"><div class="fa fa-clock stat-icon"></div><div><h4>Muộn</h4><p class="stat-number" id="lateCount">0</p></div></div>
+          </div>
+
+          <div id="studentList" style="padding:20px 24px"></div>
+
+          <div class="save-section">
+            <div style="color:#666; font-size:0.95rem;"><i class="fa fa-info-circle"></i> <span id="saveInfo">Tích chọn trạng thái cho từng học sinh</span></div>
+            <button class="btn btn-primary" onclick="saveAttendance()"><i class="fa fa-save"></i> Lưu điểm danh</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="history-modal">
+  <div class="modal" style="max-width:900px">
+    <div class="modal-header">
+      <span id="history-title">Lịch sử điểm danh</span>
+      <button class="modal-close" onclick="closeModal('history-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="history-summary" class="stats-bar" style="margin-bottom:16px"></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Ngày</th><th>Môn học</th><th>Trạng thái</th><th>Ghi chú</th><th>Người điểm danh</th></tr>
+          </thead>
+          <tbody id="history-body"><tr><td colspan="5" style="text-align:center;padding:20px;color:#999">Chưa có dữ liệu</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script>
+  if (!requireAuth()) throw new Error('Unauthorized');
+  if (getUser()?.role !== 'TEACHER') window.location.href = '../user/dashboard.html';
+  renderUserInfo();
+
+  let currentStudents = [];
+  let attendanceData = {};
+  let currentTeacher = null;
+
+  document.getElementById('attendanceDate').valueAsDate = new Date();
+
+  async function loadClasses() {
+    try {
+      if (!currentTeacher) {
+        const teacherResp = await api.teachers.getMe();
+        currentTeacher = teacherResp.data;
+      }
+      const resp = await api.classes.getAll();
+      const classes = (resp.data || []).filter(c => !currentTeacher || String(c.teacherId || '') === String(currentTeacher.id || ''));
+      const select = document.getElementById('classSelect');
+      classes.forEach(c => { select.innerHTML += `<option value="${c.id}">${c.className}</option>`; });
+    } catch (err) { showToast(err.message, 'error'); }
+  }
+
+  async function loadSchedules() {
+    const classId = document.getElementById('classSelect').value;
+    const scheduleSelect = document.getElementById('scheduleSelect');
+    scheduleSelect.innerHTML = '<option value="">-- Chọn buổi học --</option>';
+    scheduleSelect.disabled = !classId;
+    document.getElementById('attendanceContainer').style.display = 'none';
+    if (!classId) return;
+
+    try {
+      const resp = await api.schedules.getByClass(classId);
+      (resp.data || []).forEach(s => {
+        scheduleSelect.innerHTML += `<option value="${s.id}">${s.dayOfWeekText} - ${s.subject} (${s.startTime}-${s.endTime})</option>`;
+      });
+    } catch (err) { showToast(err.message, 'error'); }
+  }
+
+  async function loadStudents() {
+    const classId = document.getElementById('classSelect').value;
+    const scheduleId = document.getElementById('scheduleSelect').value;
+    if (!classId || !scheduleId) { document.getElementById('attendanceContainer').style.display = 'none'; return; }
+
+    try {
+      const resp = await api.students.byClass(classId);
+      currentStudents = resp.data || [];
+      attendanceData = {};
+      currentStudents.forEach(s => { attendanceData[s.id] = { status: 'PRESENT', note: '' }; });
+      renderStudentList();
+      await loadExistingAttendance();
+      document.getElementById('attendanceContainer').style.display = 'block';
+    } catch (err) { showToast(err.message, 'error'); }
+  }
+
+  async function loadExistingAttendance() {
+    const scheduleId = document.getElementById('scheduleSelect').value;
+    const date = document.getElementById('attendanceDate').value;
+    if (!scheduleId || !date) return;
+    try {
+      const resp = await api.attendances.getByScheduleAndDate(scheduleId, date);
+      (resp.data || []).forEach(att => {
+        if (attendanceData[att.studentId]) {
+          attendanceData[att.studentId].status = att.status;
+          attendanceData[att.studentId].note = att.note || '';
+        }
+      });
+      renderStudentList();
+    } catch (err) {
+      console.log('No existing attendance data');
+    }
+  }
+
+  function renderStudentList() {
+    const container = document.getElementById('studentList');
+    container.innerHTML = '';
+    if (currentStudents.length === 0) {
+      container.innerHTML = `<div class="empty-state"><i class="fa fa-user-slash"></i><h3>Không có học sinh</h3><p>Lớp này chưa có học sinh nào.</p></div>`;
+      return;
+    }
+
+    currentStudents.forEach(student => {
+      const status = attendanceData[student.id]?.status || 'PRESENT';
+      const initials = student.fullName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+      const card = document.createElement('div');
+      card.className = 'student-card';
+      card.innerHTML = `
+        <div class="student-avatar">${initials}</div>
+        <div class="student-name">${student.fullName}</div>
+        <div class="status-group">
+          <button class="status-btn present ${status === 'PRESENT' ? 'active' : ''}" onclick="setStatus(${student.id}, 'PRESENT')"><i class="fa fa-check-circle"></i> Có mặt</button>
+          <button class="status-btn absent ${status === 'ABSENT' ? 'active' : ''}" onclick="setStatus(${student.id}, 'ABSENT')"><i class="fa fa-times-circle"></i> Vắng</button>
+          <button class="status-btn late ${status === 'LATE' ? 'active' : ''}" onclick="setStatus(${student.id}, 'LATE')"><i class="fa fa-clock"></i> Muộn</button>
+          <button class="status-btn" onclick="viewHistory(${student.id}, '${student.fullName.replace(/'/g, "\\'")}')"><i class="fa fa-history"></i> Lịch sử</button>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+    updateStats();
+  }
+
+  function updateStats() {
+    let present = 0, absent = 0, late = 0;
+    Object.values(attendanceData).forEach(att => { if (att.status === 'PRESENT') present++; else if (att.status === 'ABSENT') absent++; else if (att.status === 'LATE') late++; });
+    document.getElementById('totalCount').textContent = currentStudents.length;
+    document.getElementById('presentCount').textContent = present;
+    document.getElementById('absentCount').textContent = absent;
+    document.getElementById('lateCount').textContent = late;
+  }
+
+  function setStatus(studentId, status) {
+    attendanceData[studentId].status = status;
+    renderStudentList();
+  }
+
+  async function saveAttendance() {
+    const scheduleId = document.getElementById('scheduleSelect').value;
+    const date = document.getElementById('attendanceDate').value;
+    if (!scheduleId || !date) { showToast('Vui lòng chọn đầy đủ thông tin', 'error'); return; }
+    const attendances = Object.keys(attendanceData).map(studentId => ({ studentId: parseInt(studentId), status: attendanceData[studentId].status, note: attendanceData[studentId].note }));
+    try {
+      await api.attendances.mark({ scheduleId: parseInt(scheduleId), attendanceDate: date, attendances });
+      showToast('Lưu điểm danh thành công');
+    } catch (err) { showToast(err.message, 'error'); }
+  }
+
+  async function viewHistory(studentId, studentName) {
+    try {
+      const res = await api.attendances.getByStudent(studentId);
+      const records = res.data || [];
+      document.getElementById('history-title').textContent = `Lịch sử điểm danh - ${studentName}`;
+      const present = records.filter(r => r.status === 'PRESENT').length;
+      const absent = records.filter(r => r.status === 'ABSENT').length;
+      const late = records.filter(r => r.status === 'LATE').length;
+      document.getElementById('history-summary').innerHTML = `
+        <div class="stat-card total"><div class="stat-icon"><i class="fa fa-list"></i></div><div class="stat-info"><h4>Tổng buổi</h4><p class="stat-number">${records.length}</p></div></div>
+        <div class="stat-card present"><div class="stat-icon"><i class="fa fa-check-circle"></i></div><div class="stat-info"><h4>Có mặt</h4><p class="stat-number">${present}</p></div></div>
+        <div class="stat-card absent"><div class="stat-icon"><i class="fa fa-times-circle"></i></div><div class="stat-info"><h4>Vắng</h4><p class="stat-number">${absent}</p></div></div>
+        <div class="stat-card late"><div class="stat-icon"><i class="fa fa-clock"></i></div><div class="stat-info"><h4>Muộn</h4><p class="stat-number">${late}</p></div></div>
+      `;
+      const tbody = document.getElementById('history-body');
+      if (!records.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:#999">Chưa có lịch sử điểm danh</td></tr>';
+      } else {
+        tbody.innerHTML = records.map(r => `
+          <tr>
+            <td>${r.attendanceDate || '—'}</td>
+            <td>${r.subject || '—'}</td>
+            <td><span class="badge ${r.status === 'PRESENT' ? 'badge-success' : r.status === 'LATE' ? 'badge-warning' : 'badge-danger'}">${r.status === 'PRESENT' ? 'Có mặt' : r.status === 'LATE' ? 'Đi muộn' : 'Vắng'}</span></td>
+            <td>${r.note || '—'}</td>
+            <td>${r.markedByName || '—'}</td>
+          </tr>
+        `).join('');
+      }
+      openModal('history-modal');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  loadClasses();
+</script>
+</body>
+</html>

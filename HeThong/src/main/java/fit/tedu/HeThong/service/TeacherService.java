@@ -30,6 +30,11 @@ public class TeacherService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy giáo viên ID: " + id)));
     }
 
+    public TeacherResponse getByUsername(String username) {
+        return toResponse(teacherRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin giáo viên!")));
+    }
+
     public List<TeacherResponse> search(String keyword) {
         return teacherRepository.searchByKeyword(keyword).stream().map(this::toResponse).collect(Collectors.toList());
     }

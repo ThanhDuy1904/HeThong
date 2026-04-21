@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lớp học của tôi – TEDU</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-brand"><span>🎓</span> TEDU Teacher</div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Chính</div>
+      <div class="nav-item" onclick="location.href='attendance.html'"><i class="fa fa-clipboard-check"></i> Điểm danh</div>
+      <div class="nav-item active" onclick="location.href='classes.html'"><i class="fa fa-school"></i> Lớp học của tôi</div>
+      <div class="nav-item" onclick="location.href='students.html'"><i class="fa fa-user-graduate"></i> Học sinh của tôi</div>
+      <div class="nav-item" onclick="location.href='../admin/timetable.html'"><i class="fa fa-calendar"></i> Thời khóa biểu</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar"><i class="fa fa-user"></i></div>
+        <div>
+          <div class="user-name" id="sidebar-username">---</div>
+          <div class="user-role" id="sidebar-role">---</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="logout()"><i class="fa fa-sign-out-alt"></i> Đăng xuất</button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <div class="topbar">
+      <div class="topbar-title"><i class="fa fa-school"></i> Lớp học của tôi</div>
+    </div>
+    <div class="page-body">
+      <div class="card">
+        <div class="card-header">
+          <span>Danh sách lớp đang phụ trách</span>
+          <button class="btn btn-outline" onclick="loadClasses()"><i class="fa fa-sync"></i> Tải lại</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>#</th><th>Tên lớp</th><th>Khối</th><th>Năm học</th><th>Học phí</th><th>Số học sinh</th><th>Thời khóa biểu</th></tr>
+            </thead>
+            <tbody id="classes-body"></tbody>
+          </table>
+        </div>
+        <div style="padding:14px 24px;color:#888;font-size:.85rem" id="table-info"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script>
+  let teacherInfo = null;
+  let teacherClasses = [];
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    if (!requireAuth()) return;
+    if (getUser()?.role !== 'TEACHER') window.location.href = '../user/dashboard.html';
+    renderUserInfo();
+    await loadClasses();
+  });
+
+  async function loadClasses() {
+    try {
+      if (!teacherInfo) {
+        const me = await api.teachers.getMe();
+        teacherInfo = me.data;
+      }
+      const res = await api.classes.getAll();
+      teacherClasses = (res.data || []).filter(c => String(c.teacherId || '') === String(teacherInfo.id || ''));
+      renderTable();
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }
+
+  function renderTable() {
+    const tbody = document.getElementById('classes-body');
+    document.getElementById('table-info').textContent = `Hiển thị ${teacherClasses.length} lớp`;
+    if (!teacherClasses.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#aaa;padding:30px">Bạn chưa được phân công lớp nào</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = teacherClasses.map((c, index) => `
+      <tr>
+        <td>${index + 1}</td>
+        <td><strong>${c.className}</strong></td>
+        <td>${c.grade || '—'}</td>
+        <td>${c.schoolYear || '—'}</td>
+        <td>${formatCurrency(c.tuitionFee)}</td>
+        <td>${c.studentCount || 0}</td>
+        <td><button class="btn btn-outline btn-sm" onclick="location.href='attendance.html'"><i class="fa fa-clipboard-check"></i> Điểm danh</button></td>
+      </tr>
+    `).join('');
+  }
+
+  function formatCurrency(v) {
+    if (v === null || v === undefined || v === '') return '—';
+    return Number(v).toLocaleString('vi-VN') + ' đ';
+  }
+
+  loadClasses();
+</script>
+</body>
+</html>

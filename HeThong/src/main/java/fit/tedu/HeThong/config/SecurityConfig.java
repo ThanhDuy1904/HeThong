@@ -73,8 +73,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
                 // Students - Only admin and teacher can view list, students cannot
                 .requestMatchers(HttpMethod.GET, "/api/students/me").authenticated() // Students can view their own info
-                .requestMatchers(HttpMethod.GET, "/api/students").hasAnyAuthority("ADMIN","TEACHER","ACCOUNTANT")
-                .requestMatchers(HttpMethod.GET, "/api/students/class/**").hasAnyAuthority("ADMIN","TEACHER","ACCOUNTANT")
+                .requestMatchers(HttpMethod.GET, "/api/students").hasAnyAuthority("ADMIN","TEACHER","STUDENT","ACCOUNTANT")
+                .requestMatchers(HttpMethod.GET, "/api/students/class/**").hasAnyAuthority("ADMIN","TEACHER","STUDENT","ACCOUNTANT")
                 .requestMatchers(HttpMethod.POST,   "/api/students/**").hasAnyAuthority("ADMIN","TEACHER","ACCOUNTANT")
                 .requestMatchers(HttpMethod.PUT,    "/api/students/**").hasAnyAuthority("ADMIN","TEACHER","ACCOUNTANT")
                 .requestMatchers(HttpMethod.DELETE, "/api/students/**").hasAuthority("ADMIN")
@@ -95,12 +95,17 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.PUT, "/api/posts/**").hasAnyAuthority("ADMIN","CONTENT_MANAGER")
                 .requestMatchers(HttpMethod.DELETE, "/api/posts/**").hasAnyAuthority("ADMIN","CONTENT_MANAGER")
                 // Schedules - All authenticated users can view, only Admin can modify
-                .requestMatchers(HttpMethod.GET, "/api/schedules/**").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/schedules/my").hasAnyAuthority("ADMIN","TEACHER","STUDENT")
+                .requestMatchers(HttpMethod.GET, "/api/schedules/class/**").hasAnyAuthority("ADMIN","TEACHER","STUDENT")
+                .requestMatchers(HttpMethod.GET, "/api/schedules/teacher/**").hasAnyAuthority("ADMIN","TEACHER")
+                .requestMatchers(HttpMethod.GET, "/api/schedules/**").hasAnyAuthority("ADMIN","TEACHER","STUDENT")
                 .requestMatchers(HttpMethod.POST,   "/api/schedules").hasAuthority("ADMIN")
                 .requestMatchers(HttpMethod.PUT,    "/api/schedules/**").hasAuthority("ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/api/schedules/**").hasAuthority("ADMIN")
-                // Attendances - Teacher and Admin can mark, students can view their own
-                .requestMatchers(HttpMethod.GET, "/api/attendances/**").authenticated()
+                // Attendances - students/teachers/admin can view history, only teacher/admin can mark
+                .requestMatchers(HttpMethod.GET, "/api/attendances/student/**").hasAnyAuthority("ADMIN","TEACHER","STUDENT")
+                .requestMatchers(HttpMethod.GET, "/api/attendances/schedule/**").hasAnyAuthority("ADMIN","TEACHER")
+                .requestMatchers(HttpMethod.GET, "/api/attendances/**").hasAnyAuthority("ADMIN","TEACHER","STUDENT")
                 .requestMatchers(HttpMethod.POST, "/api/attendances/**").hasAnyAuthority("ADMIN","TEACHER")
                 .anyRequest().authenticated()
             )

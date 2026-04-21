@@ -64,8 +64,16 @@
   }
 
   function redirectByRole(role) {
-    if (role === 'ADMIN' || role === 'TEACHER' || role === 'ACCOUNTANT') {
+    if (role === 'ADMIN') {
       window.location.href = 'admin/dashboard.html';
+      return;
+    }
+    if (role === 'TEACHER') {
+      window.location.href = 'teacher/attendance.html';
+      return;
+    }
+    if (role === 'ACCOUNTANT') {
+      window.location.href = 'admin/students.html';
       return;
     }
     if (role === 'CONTENT_MANAGER') {

@@ -33,6 +33,22 @@ public class TeacherController {
         return ResponseEntity.ok(ApiResponse.ok(teacherService.getById(id)));
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<TeacherResponse>> getMyInfo() {
+        try {
+            org.springframework.security.core.Authentication auth =
+                    org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+
+            if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) {
+                return ResponseEntity.status(401).body(ApiResponse.error("Chưa đăng nhập"));
+            }
+
+            return ResponseEntity.ok(ApiResponse.ok(teacherService.getByUsername(auth.getName())));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
     @PostMapping
     @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<ApiResponse<TeacherResponse>> create(@Valid @RequestBody TeacherRequest request) {

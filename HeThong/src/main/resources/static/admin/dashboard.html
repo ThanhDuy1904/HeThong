@@ -155,7 +155,13 @@
   document.addEventListener('DOMContentLoaded', async () => {
     if (!requireAuth()) return;
     const user = getUser();
-    if (user.role !== 'ADMIN' && user.role !== 'TEACHER' && user.role !== 'ACCOUNTANT') {
+    if (user.role === 'TEACHER') {
+      window.location.href = '../teacher/attendance.html'; return;
+    }
+    if (user.role === 'ACCOUNTANT') {
+      window.location.href = 'students.html'; return;
+    }
+    if (user.role !== 'ADMIN' && user.role !== 'TEACHER') {
       window.location.href = '../user/dashboard.html'; return;
     }
     renderUserInfo();

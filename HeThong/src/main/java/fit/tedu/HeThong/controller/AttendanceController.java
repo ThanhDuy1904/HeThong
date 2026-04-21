@@ -3,13 +3,15 @@ package fit.tedu.HeThong.controller;
 import fit.tedu.HeThong.dto.request.AttendanceRequest;
 import fit.tedu.HeThong.dto.response.ApiResponse;
 import fit.tedu.HeThong.dto.response.AttendanceResponse;
-import fit.tedu.HeThong.entity.User;
+import fit.tedu.HeThong.entity.Student;
 import fit.tedu.HeThong.service.AttendanceService;
+import fit.tedu.HeThong.repository.StudentRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,6 +24,7 @@ public class AttendanceController {
 
     private final AttendanceService attendanceService;
     private final fit.tedu.HeThong.repository.TeacherRepository teacherRepository;
+    private final StudentRepository studentRepository;
 
     @GetMapping("/schedule/{scheduleId}")
     @PreAuthorize("hasAnyAuthority('ADMIN','TEACHER')")
@@ -33,7 +36,18 @@ public class AttendanceController {
     }
 
     @GetMapping("/student/{studentId}")
+    @PreAuthorize("hasAnyAuthority('ADMIN','TEACHER','STUDENT')")
     public ResponseEntity<ApiResponse<List<AttendanceResponse>>> getByStudent(@PathVariable Long studentId) {
+        org.springframework.security.core.Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean isElevated = auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ADMIN") || a.getAuthority().equals("TEACHER"));
+        if (!isElevated) {
+            Student currentStudent = studentRepository.findByUsername(auth.getName())
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin học sinh"));
+            if (!currentStudent.getId().equals(studentId)) {
+                return ResponseEntity.status(403).body(ApiResponse.error("Bạn chỉ được xem lịch sử điểm danh của chính mình"));
+            }
+        }
         return ResponseEntity.ok(ApiResponse.ok(attendanceService.getAttendancesByStudent(studentId)));
     }
 

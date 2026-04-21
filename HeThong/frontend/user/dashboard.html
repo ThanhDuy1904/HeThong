@@ -34,6 +34,7 @@
       <div class="nav-section">Menu</div>
       <div class="nav-item active" onclick="location.href='dashboard.html'"><i class="fa fa-home"></i> Trang chủ</div>
       <div class="nav-item" onclick="location.href='classes.html'"><i class="fa fa-school"></i> Lớp học của tôi</div>
+      <div class="nav-item" onclick="location.href='attendance.html'"><i class="fa fa-clipboard-check"></i> Lịch sử điểm danh</div>
       <div class="nav-item" onclick="location.href='timetable.html'"><i class="fa fa-calendar"></i> Thời khóa biểu</div>
        <div class="nav-item" onclick="location.href='../index.html'"><i class="fa fa-video"></i> Bài đăng video</div>
     </nav>
@@ -113,6 +114,23 @@
         </div>
       </div>
 
+      <div class="card" style="margin-top:20px">
+        <div class="card-header"><i class="fa fa-clipboard-check"></i> Lịch sử điểm danh</div>
+        <div class="card-body">
+          <div id="attendance-summary" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:16px"></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Ngày</th><th>Môn học</th><th>Trạng thái</th><th>Ghi chú</th><th>Người điểm danh</th></tr>
+              </thead>
+              <tbody id="attendance-history-body">
+                <tr><td colspan="5" style="text-align:center;padding:20px;color:#999">Đang tải...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -144,6 +162,7 @@
 
     // Load schedule for student
     loadMySchedule();
+    loadAttendanceHistory();
   });
 
   async function loadMySchedule() {
@@ -218,6 +237,44 @@
       document.getElementById('schedule-table-body').innerHTML = `
         <tr><td colspan="3" style="text-align:center;padding:20px;color:#f44">Lỗi tải dữ liệu</td></tr>
       `;
+    }
+  }
+
+  async function loadAttendanceHistory() {
+    try {
+      const me = await api.students.getMe();
+      const student = me.data;
+      const res = await api.attendances.getByStudent(student.id);
+      const records = res.data || [];
+
+      const present = records.filter(r => r.status === 'PRESENT').length;
+      const absent = records.filter(r => r.status === 'ABSENT').length;
+      const late = records.filter(r => r.status === 'LATE').length;
+
+      document.getElementById('attendance-summary').innerHTML = `
+        <div class="card" style="margin:0"><div class="card-body"><strong>${records.length}</strong><div style="color:#666;font-size:.85rem">Tổng buổi</div></div></div>
+        <div class="card" style="margin:0"><div class="card-body"><strong style="color:#2d9e5c">${present}</strong><div style="color:#666;font-size:.85rem">Có mặt</div></div></div>
+        <div class="card" style="margin:0"><div class="card-body"><strong style="color:#f72585">${absent}</strong><div style="color:#666;font-size:.85rem">Vắng</div></div></div>
+        <div class="card" style="margin:0"><div class="card-body"><strong style="color:#ff9500">${late}</strong><div style="color:#666;font-size:.85rem">Đi muộn</div></div></div>
+      `;
+
+      const tbody = document.getElementById('attendance-history-body');
+      if (!records.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:#999">Chưa có lịch sử điểm danh</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = records.map(r => `
+        <tr>
+          <td>${r.attendanceDate || '—'}</td>
+          <td>${r.subject || '—'}</td>
+          <td><span class="badge ${r.status === 'PRESENT' ? 'badge-success' : r.status === 'LATE' ? 'badge-warning' : 'badge-danger'}">${r.status === 'PRESENT' ? 'Có mặt' : r.status === 'LATE' ? 'Đi muộn' : 'Vắng'}</span></td>
+          <td>${r.note || '—'}</td>
+          <td>${r.markedByName || '—'}</td>
+        </tr>
+      `).join('');
+    } catch (e) {
+      document.getElementById('attendance-history-body').innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px;color:#f44">${e.message}</td></tr>`;
     }
   }
 </script>

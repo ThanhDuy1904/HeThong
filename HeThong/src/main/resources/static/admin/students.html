@@ -49,7 +49,7 @@
             <input type="text" id="search-input" placeholder="🔍  Tìm kiếm theo tên, số điện thoại..." style="max-width:350px" />
             <button class="btn btn-outline" onclick="loadStudents()"><i class="fa fa-search"></i> Tìm</button>
           </div>
-          <button class="btn btn-primary" onclick="openAddModal()"><i class="fa fa-plus"></i> Thêm học sinh</button>
+          <button class="btn btn-primary" id="btn-add-student" onclick="openAddModal()"><i class="fa fa-plus"></i> Thêm học sinh</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -168,6 +168,10 @@
       window.location.href = '../user/dashboard.html'; return;
     }
     renderUserInfo();
+    if (user.role === 'ACCOUNTANT') {
+      const addBtn = document.getElementById('btn-add-student');
+      if (addBtn) addBtn.style.display = 'none';
+    }
     await loadClasses();
     await loadStudents();
 
@@ -219,8 +223,7 @@
         <td><span class="badge ${s.status === 'ACTIVE' ? 'badge-success' : s.status === 'GRADUATED' ? 'badge-info' : 'badge-danger'}">
           ${s.status === 'ACTIVE' ? 'Đang học' : s.status === 'GRADUATED' ? 'Tốt nghiệp' : 'Nghỉ học'}</span></td>
         <td>
-          <button class="btn btn-warning btn-sm" onclick="editStudent(${s.id})"><i class="fa fa-edit"></i></button>
-          ${isAdmin() ? `<button class="btn btn-danger btn-sm" onclick="deleteStudent(${s.id})" style="margin-left:4px"><i class="fa fa-trash"></i></button>` : ''}
+          ${isAccountant() ? `<button class="btn btn-warning btn-sm" onclick="editTuition(${s.id})"><i class="fa fa-money-bill"></i></button>` : `<button class="btn btn-warning btn-sm" onclick="editStudent(${s.id})"><i class="fa fa-edit"></i></button>${isAdmin() ? `<button class="btn btn-danger btn-sm" onclick="deleteStudent(${s.id})" style="margin-left:4px"><i class="fa fa-trash"></i></button>` : ''}`}
         </td>
       </tr>
     `).join('');
@@ -272,6 +275,31 @@
       document.getElementById('account-section').style.display = 'none';
       document.getElementById('modal-alert').innerHTML = '';
       openModal('student-modal');
+    } catch (e) { showToast(e.message, 'error'); }
+  }
+
+  async function editTuition(id) {
+    try {
+      const res = await api.students.getById(id);
+      const s = res.data;
+      const fee = prompt(`Nhập số tiền đã đóng cho ${s.fullName}`, s.tuitionPaidAmount || 0);
+      if (fee === null) return;
+      const payload = {
+        fullName: s.fullName,
+        dob: s.dob ? s.dob.substring(0, 10) : null,
+        gender: s.gender,
+        phone: s.phone,
+        classId: s.classId || null,
+        address: s.address,
+        parentName: s.parentName,
+        parentPhone: s.parentPhone,
+        status: s.status,
+        tuitionPaidAmount: Number(fee),
+        tuitionPaidFull: Number(fee) >= Number(s.classTuitionFee || 0),
+      };
+      await api.students.update(id, payload);
+      showToast('Cập nhật học phí thành công!');
+      loadStudents();
     } catch (e) { showToast(e.message, 'error'); }
   }
 
