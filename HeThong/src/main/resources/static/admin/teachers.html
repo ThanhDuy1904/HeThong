@@ -136,12 +136,12 @@
   document.addEventListener('DOMContentLoaded', async () => {
     if (!requireAuth()) return;
     const user = getUser();
-    if (user.role !== 'ADMIN' && user.role !== 'TEACHER') {
+    if (user.role !== 'ADMIN' && user.role !== 'ACADEMIC_AFFAIRS' && user.role !== 'MANAGER') {
       window.location.href = '../user/dashboard.html'; return;
     }
     renderUserInfo();
     // Non-admin teachers can't add teachers
-    if (!isAdmin()) document.getElementById('btn-add').style.display = 'none';
+    if (!['ADMIN', 'ACADEMIC_AFFAIRS', 'MANAGER'].includes(user.role)) document.getElementById('btn-add').style.display = 'none';
     await loadTeachers();
 
     document.getElementById('search-input').addEventListener('keydown', e => {
@@ -174,7 +174,7 @@
         <td>${t.username ? `<span class="badge badge-success">${t.username}</span>` : '<span style="color:#aaa">—</span>'}</td>
         <td>
           <button class="btn btn-warning btn-sm" onclick="editTeacher(${t.id})"><i class="fa fa-edit"></i></button>
-          ${isAdmin() ? `<button class="btn btn-danger btn-sm" onclick="deleteTeacher(${t.id})" style="margin-left:4px"><i class="fa fa-trash"></i></button>` : ''}
+          ${['ADMIN', 'ACADEMIC_AFFAIRS', 'MANAGER'].includes(getUser()?.role) ? `<button class="btn btn-danger btn-sm" onclick="deleteTeacher(${t.id})" style="margin-left:4px"><i class="fa fa-trash"></i></button>` : ''}
         </td>
       </tr>
     `).join('');

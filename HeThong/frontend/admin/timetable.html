@@ -50,7 +50,7 @@
               <option value="">🏫  Chọn lớp học để xem thời khóa biểu</option>
             </select>
           </div>
-          <button class="btn btn-primary" onclick="openModal('schedule-modal')"><i class="fa fa-plus"></i> Thêm lịch học</button>
+          <button class="btn btn-primary" id="btn-add-schedule" onclick="openModal('schedule-modal')"><i class="fa fa-plus"></i> Thêm lịch học</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -141,6 +141,15 @@
 <script src="../js/api.js"></script>
 <script>
   if (!requireAuth()) throw new Error('Unauthorized');
+  const currentRole = getUser()?.role;
+  if (currentRole === 'TEACHER') {
+    window.location.replace('../teacher/timetable.html');
+    throw new Error('Redirecting teacher');
+  }
+  if (!['ADMIN', 'ACADEMIC_AFFAIRS', 'MANAGER'].includes(currentRole)) {
+    redirectToRoleHome();
+    throw new Error('Forbidden');
+  }
   renderUserInfo();
 
   let currentClassId = null;

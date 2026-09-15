@@ -23,7 +23,8 @@ import java.util.Set;
 public class AuthService {
 
         private static final Set<String> ALLOWED_ROLES = Set.of(
-                        "ADMIN", "TEACHER", "STUDENT", "ACCOUNTANT", "CONTENT_MANAGER");
+                        "ADMIN", "TEACHER", "STUDENT", "ACCOUNTANT", "CONTENT_MANAGER",
+                        "ACADEMIC_AFFAIRS", "MANAGER");
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;

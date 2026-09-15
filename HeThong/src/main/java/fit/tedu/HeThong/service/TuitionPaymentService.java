@@ -53,7 +53,7 @@ public class TuitionPaymentService {
             throw new RuntimeException("Số tiền thu phải lớn hơn 0");
         }
 
-        Student student = studentRepository.findById(studentId)
+        Student student = studentRepository.findByIdForUpdate(studentId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy học sinh!"));
 
         BigDecimal classFee = student.getClassRoom() != null && student.getClassRoom().getTuitionFee() != null

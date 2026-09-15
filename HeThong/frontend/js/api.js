@@ -3,11 +3,22 @@
  * Base URL: http://localhost:8090
  */
 
-const API_BASE = 'http://localhost:8090/api';
+const API_BASE = window.location.protocol === 'file:'
+    ? 'http://localhost:8090/api'
+    : ['5500', '3000'].includes(window.location.port)
+    ? `${window.location.protocol}//${window.location.hostname}:8090/api`
+    : `${window.location.origin}/api`;
 
 // ── Auth helpers ──────────────────────────────────────────────
 function getToken()   { return localStorage.getItem('tedu_token'); }
-function getUser()    { return JSON.parse(localStorage.getItem('tedu_user') || 'null'); }
+function getUser() {
+    try {
+        return JSON.parse(localStorage.getItem('tedu_user') || 'null');
+    } catch {
+        localStorage.removeItem('tedu_user');
+        return null;
+    }
+}
 function isAdmin()    { return getUser()?.role === 'ADMIN'; }
 function isTeacher()  { return getUser()?.role === 'TEACHER'; }
 function isStudent()  { return getUser()?.role === 'STUDENT'; }
@@ -23,33 +34,73 @@ function saveAuth(data) {
     }));
 }
 
+function getRoleLandingPath(role = getUser()?.role) {
+    switch (role) {
+        case 'ADMIN':
+            return '/admin/dashboard.html';
+        case 'TEACHER':
+            return '/teacher/dashboard.html';
+        case 'ACCOUNTANT':
+            return '/accountant/dashboard.html';
+        case 'CONTENT_MANAGER':
+            return '/admin/posts.html';
+        case 'ACADEMIC_AFFAIRS':
+            return '/admin/dashboard.html';
+        case 'MANAGER':
+            return '/admin/teachers.html';
+        case 'STUDENT':
+            return '/user/dashboard.html';
+        default:
+            return '/index.html';
+    }
+}
+
+function redirectToRoleHome(role = getUser()?.role) {
+    window.location.replace(getRoleLandingPath(role));
+}
+
 function logout() {
     localStorage.removeItem('tedu_token');
     localStorage.removeItem('tedu_user');
-    window.location.href = '/index.html';
+    window.location.replace('/login.html');
 }
 
 function requireAuth() {
-    if (!isLoggedIn()) { window.location.href = '/login.html'; return false; }
+    if (!isLoggedIn()) { window.location.replace('/login.html'); return false; }
     return true;
 }
 
 function requireAdmin() {
-    if (!isLoggedIn()) { window.location.href = '/login.html'; return false; }
-    if (!isAdmin())    { window.location.href = '/user/dashboard.html'; return false; }
+    if (!isLoggedIn()) { window.location.replace('/login.html'); return false; }
+    if (!isAdmin())    { redirectToRoleHome(); return false; }
     return true;
 }
 
 // ── HTTP core ─────────────────────────────────────────────────
 async function http(method, path, body = null) {
-    const headers = { 'Content-Type': 'application/json' };
+    const headers = {};
+    const isMultipart = body instanceof FormData;
+    if (!isMultipart) headers['Content-Type'] = 'application/json';
     const token = getToken();
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const options = { method, headers };
-    if (body) options.body = JSON.stringify(body);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const options = { method, headers, signal: controller.signal };
+    if (body) options.body = isMultipart ? body : JSON.stringify(body);
 
-    const res = await fetch(API_BASE + path, options);
+    let res;
+    try {
+        res = await fetch(API_BASE + path, options);
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            throw new Error('Yêu cầu quá thời gian. Vui lòng thử lại.');
+        }
+        throw new Error('Không thể kết nối tới máy chủ.');
+    } finally {
+        clearTimeout(timeoutId);
+    }
+
     const text = await res.text();
     let json = null;
     try {
@@ -58,6 +109,13 @@ async function http(method, path, body = null) {
         json = null;
     }
     if (!res.ok) {
+        if (res.status === 401 && !path.startsWith('/auth/')) {
+            localStorage.removeItem('tedu_token');
+            localStorage.removeItem('tedu_user');
+            if (!window.location.pathname.endsWith('/login.html')) {
+                window.location.replace('/login.html');
+            }
+        }
         const message = json?.message || json?.error || text || 'Lỗi server';
         throw new Error(message);
     }
@@ -82,6 +140,7 @@ const api = {
         delete:   (id)      => http('DELETE', `/students/${id}`),
         byClass:  (cid)     => http('GET', `/students/class/${cid}`),
         removeFromClass: (id) => http('PATCH', `/students/${id}/remove-from-class`),
+        importFile: (formData) => http('POST', '/students/import', formData),
     },
 
     // Teachers
@@ -202,30 +261,84 @@ function renderRoleNavigation() {
     const role = getUser()?.role;
     if (!role) return;
 
-    const allowedLabels = {
-        ADMIN: null,
-        TEACHER: ['Học sinh', 'Giáo viên', 'Lớp học', 'Thời khóa biểu', 'Điểm danh', 'Lịch sử điểm danh', 'Tổng quan'],
-        STUDENT: ['Trang chủ', 'Lớp học của tôi', 'Danh sách học sinh', 'Thời khóa biểu', 'Lịch sử điểm danh', 'Học phí', 'Bài đăng video'],
-        ACCOUNTANT: ['Học sinh', 'Học phí', 'Tổng quan học phí', 'Tra cứu học phí'],
-        CONTENT_MANAGER: ['Bài đăng video'],
+    const menus = {
+        ADMIN: [
+            ['Tổng quan', '/admin/dashboard.html', 'tachometer-alt'],
+            ['Học sinh', '/admin/students.html', 'user-graduate'],
+            ['Giáo viên', '/admin/teachers.html', 'chalkboard-teacher'],
+            ['Lớp học', '/admin/classes.html', 'school'],
+            ['Thời khóa biểu', '/admin/timetable.html', 'calendar'],
+            ['Điểm danh', '/admin/attendance.html', 'check-circle'],
+            ['Bài đăng video', '/admin/posts.html', 'video']
+        ],
+        ACADEMIC_AFFAIRS: [
+            ['Tổng quan', '/admin/dashboard.html', 'tachometer-alt'],
+            ['Học sinh', '/admin/students.html', 'user-graduate'],
+            ['Giáo viên', '/admin/teachers.html', 'chalkboard-teacher'],
+            ['Lớp học', '/admin/classes.html', 'school'],
+            ['Thời khóa biểu', '/admin/timetable.html', 'calendar'],
+            ['Điểm danh', '/admin/attendance.html', 'check-circle']
+        ],
+        MANAGER: [
+            ['Học sinh', '/admin/students.html', 'user-graduate'],
+            ['Giáo viên', '/admin/teachers.html', 'chalkboard-teacher'],
+            ['Thời khóa biểu', '/admin/timetable.html', 'calendar']
+        ],
+        TEACHER: [
+            ['Tổng quan', '/teacher/dashboard.html', 'home'],
+            ['Học sinh', '/teacher/students.html', 'user-graduate'],
+            ['Lớp học', '/teacher/classes.html', 'school'],
+            ['Thời khóa biểu', '/teacher/timetable.html', 'calendar'],
+            ['Điểm danh', '/teacher/attendance.html', 'check-circle']
+        ]
     };
-
-    const allowed = allowedLabels[role];
-    if (!allowed) return;
-
-    document.querySelectorAll('.sidebar-nav .nav-item').forEach(item => {
-        const label = item.textContent.replace(/\s+/g, ' ').trim();
-        const visible = allowed.some(a => label.includes(a));
-        item.style.display = visible ? '' : 'none';
+    const menu = menus[role];
+    const nav = document.querySelector('.sidebar-nav');
+    if (!menu || !nav) return;
+    const currentPath = window.location.pathname;
+    nav.innerHTML = `<div class="nav-section">${role === 'TEACHER' ? 'Chính' : 'Quản lý'}</div>` +
+        menu.map(([label, href, icon]) => `
+            <div class="nav-item${currentPath.endsWith(href) ? ' active' : ''}" data-nav-href="${href}">
+                <i class="fa fa-${icon}"></i> ${label}
+            </div>`).join('');
+    nav.querySelectorAll('[data-nav-href]').forEach(item => {
+        item.addEventListener('click', () => window.location.assign(item.dataset.navHref));
     });
-
-    document.querySelectorAll('.sidebar-nav .nav-section').forEach(section => {
-        const nextItems = [];
-        let node = section.nextElementSibling;
-        while (node && !node.classList.contains('nav-section')) {
-            if (node.classList.contains('nav-item')) nextItems.push(node);
-            node = node.nextElementSibling;
-        }
-        section.style.display = nextItems.some(el => el.style.display !== 'none') ? '' : 'none';
-    });
+    const brand = document.querySelector('.sidebar-brand');
+    if (brand && role === 'TEACHER') brand.innerHTML = '<span>🎓</span> TEDU Teacher';
 }
+
+function setupMobileNavigation() {
+    const layout = document.querySelector('.layout');
+    const sidebar = document.querySelector('.sidebar');
+    const topbar = document.querySelector('.topbar');
+    if (!layout || !sidebar || !topbar || document.querySelector('.mobile-menu-toggle')) return;
+
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'mobile-menu-toggle';
+    toggle.setAttribute('aria-label', 'Mở menu');
+    toggle.innerHTML = '<i class="fa fa-bars"></i>';
+
+    const overlay = document.createElement('div');
+    overlay.className = 'sidebar-overlay';
+    layout.appendChild(overlay);
+    topbar.prepend(toggle);
+
+    const close = () => {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('show');
+        toggle.setAttribute('aria-label', 'Mở menu');
+        toggle.innerHTML = '<i class="fa fa-bars"></i>';
+    };
+    toggle.addEventListener('click', () => {
+        const open = sidebar.classList.toggle('open');
+        overlay.classList.toggle('show', open);
+        toggle.setAttribute('aria-label', open ? 'Đóng menu' : 'Mở menu');
+        toggle.innerHTML = `<i class="fa fa-${open ? 'times' : 'bars'}"></i>`;
+    });
+    overlay.addEventListener('click', close);
+    sidebar.querySelectorAll('.nav-item').forEach(item => item.addEventListener('click', close));
+}
+
+document.addEventListener('DOMContentLoaded', setupMobileNavigation);

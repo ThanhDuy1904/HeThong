@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.Authentication;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -21,17 +22,26 @@ public class ClassController {
     private final ClassService classService;
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<ClassResponse>>> getAll() {
+    public ResponseEntity<ApiResponse<List<ClassResponse>>> getAll(Authentication authentication) {
+        if (authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("TEACHER"))) {
+            return ResponseEntity.ok(ApiResponse.ok(classService.getByTeacherUsername(authentication.getName())));
+        }
         return ResponseEntity.ok(ApiResponse.ok(classService.getAll()));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<ClassResponse>> getById(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<ClassResponse>> getById(@PathVariable Long id, Authentication authentication) {
+        if (authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("TEACHER"))) {
+            return ResponseEntity.ok(ApiResponse.ok(
+                    classService.getByIdForTeacher(id, authentication.getName())));
+        }
         return ResponseEntity.ok(ApiResponse.ok(classService.getById(id)));
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ACADEMIC_AFFAIRS')")
     public ResponseEntity<ApiResponse<ClassResponse>> create(@Valid @RequestBody ClassRequest request) {
         try {
             return ResponseEntity.ok(ApiResponse.ok("Thêm lớp thành công", classService.create(request)));
@@ -41,7 +51,7 @@ public class ClassController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ACADEMIC_AFFAIRS')")
     public ResponseEntity<ApiResponse<ClassResponse>> update(
             @PathVariable Long id, @Valid @RequestBody ClassRequest request) {
         try {
@@ -52,7 +62,7 @@ public class ClassController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ACADEMIC_AFFAIRS')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         classService.delete(id);
         return ResponseEntity.ok(ApiResponse.ok("Xóa lớp thành công", null));

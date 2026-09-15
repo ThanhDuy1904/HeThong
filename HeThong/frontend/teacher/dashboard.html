@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tổng quan giáo viên - TEDU</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-brand"><span>🎓</span> TEDU Teacher</div>
+    <nav class="sidebar-nav"><div class="nav-section">Chính</div></nav>
+    <div class="sidebar-footer">
+      <div class="user-info"><div class="user-avatar"><i class="fa fa-user"></i></div><div><div class="user-name" id="sidebar-username">---</div><div class="user-role" id="sidebar-role">---</div></div></div>
+      <button class="btn-logout" onclick="logout()"><i class="fa fa-sign-out-alt"></i> Đăng xuất</button>
+    </div>
+  </aside>
+  <main class="main-content">
+    <div class="topbar"><div class="topbar-title"><i class="fa fa-home"></i> Tổng quan giáo viên</div><span id="top-user"></span></div>
+    <div class="page-body">
+      <section class="teacher-hero">
+        <div class="teacher-hero-content">
+          <p class="eyebrow">Không gian giảng dạy</p>
+          <h1>Xin chào, <span id="teacher-name"></span></h1>
+          <p>Quản lý lớp học, thời khóa biểu và điểm danh trong một không gian tập trung, rõ ràng và dễ sử dụng.</p>
+        </div>
+        <div class="hero-date"><i class="fa fa-calendar-day"></i> <span id="today-label"></span></div>
+      </section>
+      <div class="dashboard-grid">
+        <div class="card">
+          <div class="card-header"><span><i class="fa fa-id-card"></i> Thông tin tài khoản</span><span class="badge badge-info">Đang hoạt động</span></div>
+          <div class="card-body account-grid" id="account-info">Đang tải...</div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span><i class="fa fa-calendar-check"></i> Lịch dạy của tôi</span></div>
+          <div class="card-body">
+            <div class="schedule-highlight">
+              <div class="schedule-number" id="schedule-count">—</div>
+              <div><strong>buổi dạy trong tuần</strong><span>Lịch phân công hiện tại của bạn</span></div>
+            </div>
+            <div class="card-action"><button class="btn btn-primary" onclick="location.href='timetable.html'"><i class="fa fa-arrow-right"></i> Xem thời khóa biểu</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="../js/api.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!requireAuth()) return;
+  const user = getUser();
+  if (user?.role !== 'TEACHER') { redirectToRoleHome(); return; }
+  renderUserInfo();
+  document.getElementById('teacher-name').textContent = user.fullName || user.username;
+  document.getElementById('top-user').textContent = `${user.fullName || user.username} · Giáo viên`;
+  document.getElementById('today-label').textContent = new Intl.DateTimeFormat('vi-VN', {
+    weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric'
+  }).format(new Date());
+  document.getElementById('account-info').innerHTML = `
+    <div class="account-item"><i class="fa fa-user"></i><div><small>Họ và tên</small><strong>${user.fullName || 'Chưa cập nhật'}</strong></div></div>
+    <div class="account-item"><i class="fa fa-at"></i><div><small>Tên đăng nhập</small><strong>${user.username || 'Chưa cập nhật'}</strong></div></div>
+    <div class="account-item"><i class="fa fa-envelope"></i><div><small>Email</small><strong>${user.email || 'Chưa cập nhật'}</strong></div></div>
+    <div class="account-item"><i class="fa fa-shield-alt"></i><div><small>Vai trò</small><strong><span class="badge badge-warning">Giáo viên</span></strong></div></div>`;
+  try {
+    const result = await api.schedules.getMy();
+    const schedules = result.data || [];
+    document.getElementById('schedule-count').textContent = schedules.length;
+  } catch (error) {
+    document.getElementById('schedule-count').textContent = '!';
+  }
+});
+</script>
+</body>
+</html>

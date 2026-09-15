@@ -49,8 +49,13 @@
             <div style="font-weight:600">Chọn lớp để xem danh sách học sinh</div>
             <div style="color:#777;font-size:.85rem">Màn hình sẽ chỉ hiển thị học sinh sau khi chọn một lớp.</div>
           </div>
-          <button class="btn btn-primary" id="btn-add-student" onclick="openAddModal()"><i class="fa fa-plus"></i> Thêm học sinh</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-outline" onclick="document.getElementById('student-import-file').click()"><i class="fa fa-file-import"></i> Nhập file</button>
+            <input type="file" id="student-import-file" accept=".csv,.xlsx,.xls,.docx" style="display:none" onchange="importStudents(this.files[0])" />
+            <button class="btn btn-primary" id="btn-add-student" onclick="openAddModal()"><i class="fa fa-plus"></i> Thêm học sinh</button>
+          </div>
         </div>
+        <div style="padding:0 24px 14px;color:#64748b;font-size:.82rem">File Excel/CSV/Word: cột lần lượt Họ tên, SĐT, SĐT phụ huynh, Tên phụ huynh, Lớp. Nếu đã chọn lớp, tất cả học sinh sẽ được thêm vào lớp đó.</div>
         <div class="card-body" style="padding-bottom:0">
           <div class="form-group" style="max-width:420px;margin-bottom:16px">
             <label for="class-select" style="font-weight:600">Chọn lớp</label>
@@ -117,8 +122,8 @@
             <input type="text" id="s-phone" />
           </div>
           <div class="form-group">
-            <label>Lớp</label>
-            <select id="s-classId"></select>
+            <label>Lớp học (có thể chọn nhiều)</label>
+            <select id="s-classId" multiple size="4"></select>
           </div>
           <div class="form-group full">
             <label>Địa chỉ</label>
@@ -146,9 +151,8 @@
           </div>
         </div>
 
-        <!-- Account creation (only for new) -->
         <div id="account-section" style="margin-top:18px;padding-top:14px;border-top:1px solid #eee">
-          <p style="font-weight:600;font-size:.9rem;margin-bottom:10px"><i class="fa fa-key"></i> Tạo tài khoản đăng nhập (tùy chọn)</p>
+          <p style="font-weight:600;font-size:.9rem;margin-bottom:10px"><i class="fa fa-key"></i> Tài khoản đăng nhập (không bắt buộc)</p>
           <div class="form-grid">
             <div class="form-group">
               <label>Tên đăng nhập</label>
@@ -183,7 +187,7 @@
   document.addEventListener('DOMContentLoaded', async () => {
     if (!requireAuth()) return;
     const user = getUser();
-    if (user.role !== 'ADMIN' && user.role !== 'TEACHER' && user.role !== 'ACCOUNTANT') {
+    if (user.role !== 'ADMIN' && user.role !== 'ACADEMIC_AFFAIRS' && user.role !== 'MANAGER') {
       window.location.href = '../user/dashboard.html'; return;
     }
     renderUserInfo();
@@ -321,7 +325,7 @@
         <td><span class="badge ${s.status === 'ACTIVE' ? 'badge-success' : s.status === 'GRADUATED' ? 'badge-info' : 'badge-danger'}">
           ${s.status === 'ACTIVE' ? 'Đang học' : s.status === 'GRADUATED' ? 'Tốt nghiệp' : 'Nghỉ học'}</span></td>
         <td>
-          ${isAccountant() ? `<button class="btn btn-warning btn-sm" onclick="editTuition(${s.id})"><i class="fa fa-money-bill"></i></button>` : `<button class="btn btn-warning btn-sm" onclick="editStudent(${s.id})"><i class="fa fa-edit"></i></button>${isAdmin() ? `<button class="btn btn-danger btn-sm" onclick="deleteStudent(${s.id})" style="margin-left:4px"><i class="fa fa-trash"></i></button>` : ''}`}
+          ${isAccountant() ? `<button class="btn btn-warning btn-sm" onclick="editTuition(${s.id})"><i class="fa fa-money-bill"></i></button>` : `<button class="btn btn-warning btn-sm" onclick="editStudent(${s.id})"><i class="fa fa-edit"></i></button>${['ADMIN', 'ACADEMIC_AFFAIRS', 'MANAGER'].includes(getUser()?.role) ? `<button class="btn btn-danger btn-sm" onclick="deleteStudent(${s.id})" style="margin-left:4px"><i class="fa fa-trash"></i></button>` : ''}`}
         </td>
       </tr>
     `).join('');
@@ -351,7 +355,7 @@
       document.getElementById('s-dob').value = s.dob ? s.dob.substring(0,10) : '';
       document.getElementById('s-gender').value = s.gender || '';
       document.getElementById('s-phone').value = s.phone || '';
-      document.getElementById('s-classId').value = s.classId || '';
+      Array.from(document.getElementById('s-classId').options).forEach(o => o.selected = (s.classIds || [s.classId]).map(String).includes(o.value));
       document.getElementById('s-address').value = s.address || '';
       document.getElementById('s-parentName').value = s.parentName || '';
       document.getElementById('s-parentPhone').value = s.parentPhone || '';
@@ -395,7 +399,8 @@
       dob:         document.getElementById('s-dob').value || null,
       gender:      document.getElementById('s-gender').value,
       phone:       document.getElementById('s-phone').value,
-      classId:     document.getElementById('s-classId').value || null,
+      classIds:    Array.from(document.getElementById('s-classId').selectedOptions).map(o => Number(o.value)),
+      classId:     Array.from(document.getElementById('s-classId').selectedOptions).map(o => o.value)[0] || null,
       address:     document.getElementById('s-address').value,
       parentName:  document.getElementById('s-parentName').value,
       parentPhone: document.getElementById('s-parentPhone').value,
@@ -421,6 +426,22 @@
       loadStudents();
     } catch (e) {
       document.getElementById('modal-alert').innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+    }
+  }
+
+  async function importStudents(file) {
+    if (!file) return;
+    const form = new FormData();
+    form.append('file', file);
+    const classId = document.getElementById('class-select').value;
+    if (classId) form.append('classId', classId);
+    try {
+      const result = await api.students.importFile(form);
+      showToast(result.message || `Đã nhập ${result.data} học sinh`);
+      document.getElementById('student-import-file').value = '';
+      if (currentClassId) await loadStudents();
+    } catch (e) {
+      showToast(e.message, 'error');
     }
   }
 

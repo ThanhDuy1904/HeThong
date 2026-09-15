@@ -192,7 +192,7 @@
     if (user.role === 'ACCOUNTANT') {
       window.location.href = 'students.html'; return;
     }
-    if (user.role !== 'ADMIN' && user.role !== 'TEACHER') {
+    if (user.role !== 'ADMIN' && user.role !== 'ACADEMIC_AFFAIRS') {
       window.location.href = '../user/dashboard.html'; return;
     }
     renderUserInfo();

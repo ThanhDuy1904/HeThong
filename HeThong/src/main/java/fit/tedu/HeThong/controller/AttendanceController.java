@@ -27,20 +27,31 @@ public class AttendanceController {
     private final StudentRepository studentRepository;
 
     @GetMapping("/schedule/{scheduleId}")
-    @PreAuthorize("hasAnyAuthority('ADMIN','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('ADMIN','TEACHER','ACADEMIC_AFFAIRS')")
     public ResponseEntity<ApiResponse<List<AttendanceResponse>>> getByScheduleAndDate(
             @PathVariable Long scheduleId,
             @RequestParam String date) {
+        org.springframework.security.core.Authentication auth =
+                SecurityContextHolder.getContext().getAuthentication();
+        Long teacherId = auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("TEACHER"))
+                ? teacherRepository.findByUsername(auth.getName())
+                    .map(fit.tedu.HeThong.entity.Teacher::getId).orElse(null)
+                : null;
         return ResponseEntity.ok(ApiResponse.ok(
-                attendanceService.getAttendancesByScheduleAndDate(scheduleId, date)));
+                attendanceService.getAttendancesByScheduleAndDate(scheduleId, date, teacherId)));
     }
 
     @GetMapping("/student/{studentId}")
-    @PreAuthorize("hasAnyAuthority('ADMIN','TEACHER','STUDENT')")
+    @PreAuthorize("hasAnyAuthority('ADMIN','TEACHER','ACADEMIC_AFFAIRS','STUDENT')")
     public ResponseEntity<ApiResponse<List<AttendanceResponse>>> getByStudent(@PathVariable Long studentId) {
         org.springframework.security.core.Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean isTeacher = auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("TEACHER"));
         boolean isElevated = auth != null && auth.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ADMIN") || a.getAuthority().equals("TEACHER"));
+                .anyMatch(a -> a.getAuthority().equals("ADMIN")
+                        || a.getAuthority().equals("TEACHER")
+                        || a.getAuthority().equals("ACADEMIC_AFFAIRS"));
         if (!isElevated) {
             Student currentStudent = studentRepository.findByUsername(auth.getName())
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin học sinh"));
@@ -48,11 +59,14 @@ public class AttendanceController {
                 return ResponseEntity.status(403).body(ApiResponse.error("Bạn chỉ được xem lịch sử điểm danh của chính mình"));
             }
         }
-        return ResponseEntity.ok(ApiResponse.ok(attendanceService.getAttendancesByStudent(studentId)));
+        List<AttendanceResponse> data = isTeacher
+                ? attendanceService.getAttendancesByStudentForTeacher(studentId, auth.getName())
+                : attendanceService.getAttendancesByStudent(studentId);
+        return ResponseEntity.ok(ApiResponse.ok(data));
     }
 
     @PostMapping("/mark")
-    @PreAuthorize("hasAnyAuthority('ADMIN','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('ADMIN','TEACHER','ACADEMIC_AFFAIRS')")
     public ResponseEntity<ApiResponse<List<AttendanceResponse>>> markAttendance(
             @Valid @RequestBody AttendanceRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {

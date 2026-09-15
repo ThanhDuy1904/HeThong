@@ -50,7 +50,7 @@ public class TeacherController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ACADEMIC_AFFAIRS','MANAGER')")
     public ResponseEntity<ApiResponse<TeacherResponse>> create(@Valid @RequestBody TeacherRequest request) {
         try {
             return ResponseEntity.ok(ApiResponse.ok("Thêm giáo viên thành công", teacherService.create(request)));
@@ -60,7 +60,7 @@ public class TeacherController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ADMIN','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ACADEMIC_AFFAIRS','MANAGER')")
     public ResponseEntity<ApiResponse<TeacherResponse>> update(
             @PathVariable Long id, @Valid @RequestBody TeacherRequest request) {
         try {
@@ -71,7 +71,7 @@ public class TeacherController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ACADEMIC_AFFAIRS','MANAGER')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         teacherService.delete(id);
         return ResponseEntity.ok(ApiResponse.ok("Xóa giáo viên thành công", null));

@@ -48,6 +48,18 @@ public class ScheduleService {
                 .collect(Collectors.toList());
     }
 
+    public List<ScheduleResponse> getSchedulesByClassForTeacher(Long classId, String username) {
+        boolean assigned = teacherRepository.findByUsername(username)
+                .map(teacher -> classRoomRepository.findById(classId)
+                        .map(cls -> cls.getTeacher() != null && cls.getTeacher().getId().equals(teacher.getId()))
+                        .orElse(false))
+                .orElse(false);
+        if (!assigned) {
+            throw new org.springframework.security.access.AccessDeniedException("Giáo viên không phụ trách lớp này");
+        }
+        return getSchedulesByClass(classId);
+    }
+
     public List<ScheduleResponse> getSchedulesByTeacher(Long teacherId) {
         return scheduleRepository.findByTeacherIdOrderByDayOfWeekAscStartTimeAsc(teacherId)
                 .stream()
@@ -55,10 +67,28 @@ public class ScheduleService {
                 .collect(Collectors.toList());
     }
 
+    public List<ScheduleResponse> getSchedulesByTeacherForUser(Long teacherId, String username) {
+        Long currentTeacherId = teacherRepository.findByUsername(username)
+                .map(Teacher::getId)
+                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException(
+                        "Tài khoản không phải giáo viên"));
+        if (!currentTeacherId.equals(teacherId)) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Giáo viên chỉ được xem thời khóa biểu của mình");
+        }
+        return getSchedulesByTeacher(teacherId);
+    }
+
     public ScheduleResponse getById(Long id) {
         Schedule schedule = scheduleRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy lịch học"));
         return toResponse(schedule);
+    }
+
+    public ScheduleResponse getByIdForTeacher(Long id, String username) {
+        ScheduleResponse response = getById(id);
+        getSchedulesByClassForTeacher(response.getClassId(), username);
+        return response;
     }
 
     @Transactional

@@ -134,11 +134,11 @@
   document.addEventListener('DOMContentLoaded', async () => {
     if (!requireAuth()) return;
     const user = getUser();
-    if (user.role !== 'ADMIN' && user.role !== 'TEACHER' && user.role !== 'ACCOUNTANT') {
+    if (user.role !== 'ADMIN' && user.role !== 'ACADEMIC_AFFAIRS') {
       window.location.href = '../user/dashboard.html'; return;
     }
     renderUserInfo();
-    if (!isAdmin()) document.getElementById('btn-add').style.display = 'none';
+    if (user.role !== 'ADMIN' && user.role !== 'ACADEMIC_AFFAIRS') document.getElementById('btn-add').style.display = 'none';
     await loadTeachersForSelect();
     await loadClasses();
   });
@@ -181,7 +181,7 @@
           </button>
         </td>
         <td>
-          ${isAdmin() ? `
+          ${['ADMIN', 'ACADEMIC_AFFAIRS'].includes(getUser()?.role) ? `
           <button class="btn btn-warning btn-sm" onclick="editClass(${c.id})"><i class="fa fa-edit"></i></button>
           <button class="btn btn-danger btn-sm" onclick="deleteClass(${c.id})" style="margin-left:4px"><i class="fa fa-trash"></i></button>
           ` : isAccountant() ? `<button class="btn btn-warning btn-sm" onclick="editTuition(${c.id}, '${c.className}', ${c.tuitionFee || 0})"><i class="fa fa-money-bill"></i></button>` : '<span style="color:#aaa">—</span>'}

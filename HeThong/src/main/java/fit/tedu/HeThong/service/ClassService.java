@@ -3,6 +3,7 @@ package fit.tedu.HeThong.service;
 import fit.tedu.HeThong.dto.request.ClassRequest;
 import fit.tedu.HeThong.dto.response.ClassResponse;
 import fit.tedu.HeThong.entity.ClassRoom;
+import fit.tedu.HeThong.entity.Teacher;
 import fit.tedu.HeThong.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,9 +25,28 @@ public class ClassService {
         return classRoomRepository.findAll().stream().map(this::toResponse).collect(Collectors.toList());
     }
 
+    public List<ClassResponse> getByTeacherUsername(String username) {
+        Teacher teacher = teacherRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin giáo viên"));
+        return classRoomRepository.findByTeacherId(teacher.getId()).stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
     public ClassResponse getById(Long id) {
         return toResponse(classRoomRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy lớp ID: " + id)));
+    }
+
+    public ClassResponse getByIdForTeacher(Long id, String username) {
+        Teacher teacher = teacherRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin giáo viên"));
+        ClassRoom cls = classRoomRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy lớp ID: " + id));
+        if (cls.getTeacher() == null || !cls.getTeacher().getId().equals(teacher.getId())) {
+            throw new org.springframework.security.access.AccessDeniedException("Giáo viên không phụ trách lớp này");
+        }
+        return toResponse(cls);
     }
 
     @Transactional
@@ -75,7 +95,7 @@ public class ClassService {
     public long countAll() { return classRoomRepository.count(); }
 
     private ClassResponse toResponse(ClassRoom c) {
-        long studentCount = studentRepository.findByClassRoomId(c.getId()).size();
+        long studentCount = studentRepository.countByAnyClassId(c.getId());
         return ClassResponse.builder()
                 .id(c.getId())
                 .className(c.getClassName())

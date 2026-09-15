@@ -5,6 +5,8 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "students")
@@ -25,6 +27,13 @@ public class Student {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "class_id")
     private ClassRoom classRoom;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(name = "student_classes",
+            joinColumns = @JoinColumn(name = "student_id"),
+            inverseJoinColumns = @JoinColumn(name = "class_id"))
+    @Builder.Default
+    private Set<ClassRoom> classes = new LinkedHashSet<>();
 
     @Column(name = "full_name", nullable = false, length = 150)
     private String fullName;

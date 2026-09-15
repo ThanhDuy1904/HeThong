@@ -4,6 +4,7 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -21,6 +22,8 @@ public class StudentResponse {
     private String status;
     private Long classId;
     private String className;
+    private List<Long> classIds;
+    private List<String> classNames;
     private BigDecimal classTuitionFee;
     private BigDecimal tuitionPaidAmount;
     private boolean tuitionPaidFull;

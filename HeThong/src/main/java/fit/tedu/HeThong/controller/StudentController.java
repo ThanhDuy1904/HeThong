@@ -9,8 +9,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.Authentication;
 
 import java.util.List;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/students")
@@ -46,17 +48,28 @@ public class StudentController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<StudentResponse>> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.ok(studentService.getById(id)));
+    public ResponseEntity<ApiResponse<StudentResponse>> getById(@PathVariable Long id, Authentication authentication) {
+        boolean isTeacher = authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("TEACHER"));
+        StudentResponse data = isTeacher
+                ? studentService.getByIdForTeacher(id, authentication.getName())
+                : studentService.getById(id);
+        return ResponseEntity.ok(ApiResponse.ok(data));
     }
 
     @GetMapping("/class/{classId}")
-    public ResponseEntity<ApiResponse<List<StudentResponse>>> getByClass(@PathVariable Long classId) {
+    public ResponseEntity<ApiResponse<List<StudentResponse>>> getByClass(
+            @PathVariable Long classId, Authentication authentication) {
+        if (authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("TEACHER"))) {
+            return ResponseEntity.ok(ApiResponse.ok(
+                    studentService.getByClassForTeacher(classId, authentication.getName())));
+        }
         return ResponseEntity.ok(ApiResponse.ok(studentService.getByClass(classId)));
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('ADMIN','TEACHER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ACADEMIC_AFFAIRS','MANAGER')")
     public ResponseEntity<ApiResponse<StudentResponse>> create(@Valid @RequestBody StudentRequest request) {
         try {
             return ResponseEntity.ok(ApiResponse.ok("Thêm học sinh thành công", studentService.create(request)));
@@ -65,8 +78,21 @@ public class StudentController {
         }
     }
 
+    @PostMapping("/import")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ACADEMIC_AFFAIRS','MANAGER')")
+    public ResponseEntity<ApiResponse<Integer>> importStudents(
+            @RequestPart("file") MultipartFile file,
+            @RequestParam(required = false) Long classId) {
+        try {
+            int count = studentService.importFile(file, classId);
+            return ResponseEntity.ok(ApiResponse.ok("Đã nhập " + count + " học sinh", count));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ADMIN','TEACHER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ACADEMIC_AFFAIRS','MANAGER')")
     public ResponseEntity<ApiResponse<StudentResponse>> update(
             @PathVariable Long id, @Valid @RequestBody StudentRequest request) {
         try {
@@ -77,14 +103,14 @@ public class StudentController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ACADEMIC_AFFAIRS','MANAGER')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         studentService.delete(id);
         return ResponseEntity.ok(ApiResponse.ok("Xóa học sinh thành công", null));
     }
 
     @PatchMapping("/{id}/remove-from-class")
-    @PreAuthorize("hasAnyAuthority('ADMIN','TEACHER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ACADEMIC_AFFAIRS','MANAGER')")
     public ResponseEntity<ApiResponse<StudentResponse>> removeFromClass(@PathVariable Long id) {
         try {
             return ResponseEntity.ok(ApiResponse.ok("Loại bỏ học sinh khỏi lớp thành công", 

@@ -11,7 +11,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Objects;
 import java.util.stream.Collectors;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
 
 @Service
 @RequiredArgsConstructor
@@ -19,6 +27,7 @@ public class StudentService {
 
     private final StudentRepository studentRepository;
     private final ClassRoomRepository classRoomRepository;
+    private final TeacherRepository teacherRepository;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
@@ -33,12 +42,42 @@ public class StudentService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy học sinh ID: " + id)));
     }
 
+    public StudentResponse getByIdForTeacher(Long id, String username) {
+        Student student = studentRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy học sinh ID: " + id));
+        Long teacherId = teacherRepository.findByUsername(username)
+                .map(Teacher::getId)
+                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException(
+                        "Tài khoản không phải giáo viên"));
+        boolean assigned = student.getClasses().stream()
+                .anyMatch(cls -> cls.getTeacher() != null && cls.getTeacher().getId().equals(teacherId));
+        if (!assigned && (student.getClassRoom() == null || student.getClassRoom().getTeacher() == null
+                || !student.getClassRoom().getTeacher().getId().equals(teacherId))) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Giáo viên không phụ trách học sinh này");
+        }
+        return toResponse(student);
+    }
+
     public List<StudentResponse> search(String keyword) {
         return studentRepository.searchByKeyword(keyword).stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     public List<StudentResponse> getByClass(Long classId) {
-        return studentRepository.findByClassRoomId(classId).stream().map(this::toResponse).collect(Collectors.toList());
+        return studentRepository.findByAnyClassId(classId).stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    public List<StudentResponse> getByClassForTeacher(Long classId, String username) {
+        boolean assigned = teacherRepository.findByUsername(username)
+                .map(teacher -> classRoomRepository.findById(classId)
+                        .map(classRoom -> classRoom.getTeacher() != null
+                                && classRoom.getTeacher().getId().equals(teacher.getId()))
+                        .orElse(false))
+                .orElse(false);
+        if (!assigned) {
+            throw new org.springframework.security.access.AccessDeniedException("Giáo viên không phụ trách lớp này");
+        }
+        return getByClass(classId);
     }
 
     @Transactional
@@ -56,8 +95,13 @@ public class StudentService {
         student.setTuitionPaidFull(Boolean.TRUE.equals(req.getTuitionPaidFull()));
 
         if (req.getClassId() != null) {
-            classRoomRepository.findById(req.getClassId()).ifPresent(student::setClassRoom);
+            classRoomRepository.findById(req.getClassId()).ifPresent(cls -> {
+                student.setClassRoom(cls);
+                student.getClasses().add(cls);
+            });
         }
+
+        assignClasses(student, req);
         normalizeTuition(student);
 
         // Create linked user account if provided
@@ -87,6 +131,76 @@ public class StudentService {
     }
 
     @Transactional
+    public int importFile(MultipartFile file, Long defaultClassId) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Vui lòng chọn file danh sách học sinh");
+        }
+        String name = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase();
+        try {
+            List<String[]> rows = new java.util.ArrayList<>();
+            if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+                try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
+                    Sheet sheet = workbook.getSheetAt(0);
+                    for (Row row : sheet) {
+                        String[] values = new String[5];
+                        for (int i = 0; i < values.length; i++) {
+                            Cell cell = row.getCell(i);
+                            values[i] = cell == null ? "" : new DataFormatter().formatCellValue(cell).trim();
+                        }
+                        if (!values[0].isBlank() && !values[0].equalsIgnoreCase("họ tên")
+                                && !values[0].equalsIgnoreCase("ho ten")) rows.add(values);
+                    }
+                }
+            } else if (name.endsWith(".docx")) {
+                try (XWPFDocument document = new XWPFDocument(file.getInputStream())) {
+                    document.getTables().forEach(table -> table.getRows().forEach(row -> {
+                        List<String> cells = row.getTableCells().stream().map(c -> c.getText().trim()).toList();
+                        if (!cells.isEmpty() && !cells.get(0).equalsIgnoreCase("họ tên")
+                                && !cells.get(0).equalsIgnoreCase("ho ten")) {
+                            rows.add(java.util.stream.Stream.concat(cells.stream(), java.util.stream.Stream.generate(() -> ""))
+                                    .limit(5).toArray(String[]::new));
+                        }
+                    }));
+                }
+            } else {
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                        file.getInputStream(), StandardCharsets.UTF_8))) {
+                    String line;
+                    boolean first = true;
+                    while ((line = reader.readLine()) != null) {
+                        if (first && line.toLowerCase().contains("họ")) { first = false; continue; }
+                        first = false;
+                        String[] values = line.split(",", -1);
+                        if (values.length > 0 && !values[0].trim().isBlank()) {
+                            rows.add(java.util.Arrays.copyOf(values, 5));
+                        }
+                    }
+                }
+            }
+            int imported = 0;
+            for (String[] row : rows) {
+                StudentRequest request = new StudentRequest();
+                request.setFullName(row[0].trim());
+                request.setPhone(row[1].trim());
+                request.setParentPhone(row[2].trim());
+                request.setParentName(row[3].trim());
+                Long classId = defaultClassId;
+                if (classId == null && row[4] != null && !row[4].isBlank()) {
+                    classId = classRoomRepository.findAll().stream()
+                            .filter(c -> c.getClassName().equalsIgnoreCase(row[4].trim()))
+                            .map(ClassRoom::getId).findFirst().orElse(null);
+                }
+                request.setClassId(classId);
+                create(request);
+                imported++;
+            }
+            return imported;
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Không thể đọc file danh sách: " + e.getMessage(), e);
+        }
+    }
+
+    @Transactional
     public StudentResponse update(Long id, StudentRequest req) {
         Student student = studentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy học sinh!"));
@@ -103,8 +217,9 @@ public class StudentService {
         if (req.getTuitionPaidAmount() != null) student.setTuitionPaidAmount(req.getTuitionPaidAmount());
         if (req.getTuitionPaidFull() != null) student.setTuitionPaidFull(req.getTuitionPaidFull());
         if (req.getClassId() != null) {
-            classRoomRepository.findById(req.getClassId()).ifPresent(student::setClassRoom);
+            classRoomRepository.findById(req.getClassId()).ifPresent(cls -> student.setClassRoom(cls));
         }
+        assignClasses(student, req);
         normalizeTuition(student);
 
         // Update user account password if provided
@@ -144,6 +259,7 @@ public class StudentService {
         Student student = studentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy học sinh!"));
         student.setClassRoom(null);
+        student.getClasses().clear();
         return toResponse(studentRepository.save(student));
     }
 
@@ -214,6 +330,8 @@ public class StudentService {
                 .status(s.getStatus())
                 .classId(s.getClassRoom() != null ? s.getClassRoom().getId() : null)
                 .className(s.getClassRoom() != null ? s.getClassRoom().getClassName() : null)
+                .classIds(s.getClasses().stream().map(ClassRoom::getId).filter(Objects::nonNull).toList())
+                .classNames(s.getClasses().stream().map(ClassRoom::getClassName).filter(Objects::nonNull).toList())
                 .classTuitionFee(s.getClassRoom() != null ? s.getClassRoom().getTuitionFee() : null)
                 .tuitionPaidAmount(paid)
                 .tuitionPaidFull(s.isTuitionPaidFull())
@@ -222,5 +340,24 @@ public class StudentService {
                 .username(s.getUser() != null ? s.getUser().getUsername() : null)
                 .createdAt(s.getCreatedAt())
                 .build();
+    }
+
+    private void assignClasses(Student student, StudentRequest req) {
+        boolean classSelectionProvided = req.getClassIds() != null || req.getClassId() != null;
+        List<Long> ids = req.getClassIds() == null ? List.of() : req.getClassIds().stream()
+                .filter(Objects::nonNull).distinct().toList();
+        if (req.getClassId() != null && !ids.contains(req.getClassId())) {
+            ids = new java.util.ArrayList<>(ids);
+            ids.add(req.getClassId());
+        }
+        if (classSelectionProvided) {
+            List<ClassRoom> classes = classRoomRepository.findAllById(ids);
+            student.setClasses(new LinkedHashSet<>(classes));
+            if (classes.isEmpty()) {
+                student.setClassRoom(null);
+            } else if (student.getClassRoom() == null || !ids.contains(student.getClassRoom().getId())) {
+                student.setClassRoom(classes.get(0));
+            }
+        }
     }
 }

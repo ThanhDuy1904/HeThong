@@ -42,6 +42,8 @@
             <option value="TEACHER">Giáo viên</option>
             <option value="ACCOUNTANT">Kế toán</option>
             <option value="CONTENT_MANAGER">Quản lý nội dung</option>
+            <option value="ACADEMIC_AFFAIRS">Giáo vụ</option>
+            <option value="MANAGER">Quản lý</option>
           </select>
         </div>
       </div>
@@ -61,11 +63,7 @@
 <script>
   if (isLoggedIn()) {
     const r = getUser().role;
-    if (r === 'ADMIN') window.location.href = 'admin/dashboard.html';
-    else if (r === 'TEACHER') window.location.href = 'teacher/attendance.html';
-    else if (r === 'ACCOUNTANT') window.location.href = 'admin/students.html';
-    else if (r === 'CONTENT_MANAGER') window.location.href = 'admin/posts.html';
-    else window.location.href = 'user/dashboard.html';
+    redirectToRoleHome(r);
   }
 
   document.getElementById('reg-form').addEventListener('submit', async (e) => {
@@ -88,11 +86,7 @@
       alertBox.innerHTML = `<div class="alert alert-success"><i class="fa fa-check-circle"></i> Đăng ký thành công! Đang chuyển hướng...</div>`;
       setTimeout(() => {
         const role = res.data.role;
-        if (role === 'ADMIN') window.location.href = 'admin/dashboard.html';
-        else if (role === 'TEACHER') window.location.href = 'teacher/attendance.html';
-        else if (role === 'ACCOUNTANT') window.location.href = 'admin/students.html';
-        else if (role === 'CONTENT_MANAGER') window.location.href = 'admin/posts.html';
-        else window.location.href = 'user/dashboard.html';
+        redirectToRoleHome(role);
       }, 1000);
     } catch (err) {
       alertBox.innerHTML = `<div class="alert alert-error"><i class="fa fa-times-circle"></i> ${err.message}</div>`;

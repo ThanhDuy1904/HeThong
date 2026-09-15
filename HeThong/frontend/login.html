@@ -46,41 +46,13 @@
     <div class="toggle-link">Chưa có tài khoản? <a href="register.html">Đăng ký ngay</a></div>
     <div class="toggle-link" style="margin-top:8px">Xem bảng tin công khai: <a href="index.html">Trang bài đăng</a></div>
 
-    <div style="margin-top:20px;padding:12px;background:#f8f9fa;border-radius:8px;font-size:.8rem;color:#666">
-      <strong>Tài khoản demo:</strong><br/>
-      Admin: <code>admin / admin123</code><br/>
-      Giáo viên: <code>giaovien01 / teacher123</code><br/>
-      Kế toán: <code>ketoan01 / teacher123</code><br/>
-      Nội dung: <code>content01 / teacher123</code><br/>
-      Học sinh: <code>hocsinh01 / student123</code>
-    </div>
   </div>
 </div>
 
 <script src="js/api.js"></script>
 <script>
   if (isLoggedIn()) {
-    redirectByRole(getUser().role);
-  }
-
-  function redirectByRole(role) {
-    if (role === 'ADMIN') {
-      window.location.href = 'admin/dashboard.html';
-      return;
-    }
-    if (role === 'TEACHER') {
-      window.location.href = 'teacher/attendance.html';
-      return;
-    }
-    if (role === 'ACCOUNTANT') {
-      window.location.href = 'accountant/dashboard.html';
-      return;
-    }
-    if (role === 'CONTENT_MANAGER') {
-      window.location.href = 'admin/posts.html';
-      return;
-    }
-    window.location.href = 'user/dashboard.html';
+    redirectToRoleHome();
   }
 
   function togglePw() {
@@ -105,7 +77,7 @@
       });
       saveAuth(res.data);
       alertBox.innerHTML = `<div class="alert alert-success"><i class="fa fa-check-circle"></i> ${res.message}</div>`;
-      setTimeout(() => redirectByRole(res.data.role), 800);
+      setTimeout(() => redirectToRoleHome(res.data.role), 300);
     } catch (err) {
       alertBox.innerHTML = `<div class="alert alert-error"><i class="fa fa-times-circle"></i> ${err.message}</div>`;
       btn.disabled = false;

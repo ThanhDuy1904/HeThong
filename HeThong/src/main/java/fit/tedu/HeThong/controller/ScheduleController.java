@@ -38,22 +38,43 @@ public class ScheduleController {
 
     @GetMapping("/class/{classId}")
     public ResponseEntity<ApiResponse<List<ScheduleResponse>>> getByClass(@PathVariable Long classId) {
+        org.springframework.security.core.Authentication auth =
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("TEACHER"))) {
+            return ResponseEntity.ok(ApiResponse.ok(
+                    scheduleService.getSchedulesByClassForTeacher(classId, auth.getName())));
+        }
         return ResponseEntity.ok(ApiResponse.ok(scheduleService.getSchedulesByClass(classId)));
     }
 
     @GetMapping("/teacher/{teacherId}")
-    @PreAuthorize("hasAnyAuthority('ADMIN','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('ADMIN','TEACHER','ACADEMIC_AFFAIRS','MANAGER')")
     public ResponseEntity<ApiResponse<List<ScheduleResponse>>> getByTeacher(@PathVariable Long teacherId) {
-        return ResponseEntity.ok(ApiResponse.ok(scheduleService.getSchedulesByTeacher(teacherId)));
+        org.springframework.security.core.Authentication auth =
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        boolean isTeacher = auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("TEACHER"));
+        List<ScheduleResponse> data = isTeacher
+                ? scheduleService.getSchedulesByTeacherForUser(teacherId, auth.getName())
+                : scheduleService.getSchedulesByTeacher(teacherId);
+        return ResponseEntity.ok(ApiResponse.ok(data));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<ScheduleResponse>> getById(@PathVariable Long id) {
+        org.springframework.security.core.Authentication auth =
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("TEACHER"))) {
+            return ResponseEntity.ok(ApiResponse.ok(
+                    scheduleService.getByIdForTeacher(id, auth.getName())));
+        }
         return ResponseEntity.ok(ApiResponse.ok(scheduleService.getById(id)));
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ACADEMIC_AFFAIRS','MANAGER')")
     public ResponseEntity<ApiResponse<ScheduleResponse>> create(@Valid @RequestBody ScheduleRequest request) {
         try {
             return ResponseEntity.ok(ApiResponse.ok("Thêm lịch học thành công", scheduleService.create(request)));
@@ -63,7 +84,7 @@ public class ScheduleController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ACADEMIC_AFFAIRS','MANAGER')")
     public ResponseEntity<ApiResponse<ScheduleResponse>> update(
             @PathVariable Long id, @Valid @RequestBody ScheduleRequest request) {
         try {
@@ -74,7 +95,7 @@ public class ScheduleController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ACADEMIC_AFFAIRS','MANAGER')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         scheduleService.delete(id);
         return ResponseEntity.ok(ApiResponse.ok("Xóa lịch học thành công", null));

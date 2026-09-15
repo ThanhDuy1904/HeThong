@@ -134,6 +134,58 @@
       color: #999;
       font-size: 1.1rem;
     }
+    .attendance-detail-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .attendance-detail-group {
+      padding: 12px;
+      border-radius: 8px;
+      background: #f8f9fa;
+      border-left: 4px solid #43e97b;
+    }
+    .attendance-detail-group.absent { border-left-color: #f72585; }
+    .attendance-detail-group.late { border-left-color: #ff9500; }
+    .attendance-detail-group h4 { margin: 0 0 8px; }
+    .attendance-detail-group ul { margin: 0; padding-left: 20px; color: #555; }
+    .attendance-page-body { max-width: 1180px; width: 100%; margin: 0 auto; }
+    .attendance-filter { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; width: 100%; }
+    .attendance-filter-field { min-width: 0 !important; }
+    .attendance-filter-field label { display: block; margin-bottom: 6px; }
+    .attendance-filter-field select,
+    .attendance-filter-field input { min-height: 42px; }
+    .attendance-history-card .card-header { gap: 12px; }
+    .attendance-history-card .table-wrap { overflow-x: auto; }
+    #attendanceDetailModal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(15, 23, 42, .52);
+    }
+    #attendanceDetailModal.show { display: flex; }
+    #attendanceDetailModal .modal-content {
+      width: min(760px, 100%);
+      max-height: min(720px, 90vh);
+      overflow-y: auto;
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 20px 60px rgba(15, 23, 42, .25);
+    }
+    #attendanceDetailModal .modal-header h3 { margin: 0; font-size: 1.05rem; }
+    @media (max-width: 900px) {
+      .attendance-filter { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 560px) {
+      .attendance-filter { grid-template-columns: 1fr; gap: 10px; }
+      #attendanceDetailModal { padding: 12px; }
+      .attendance-detail-list { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -169,28 +221,30 @@
     <div class="topbar">
       <div class="topbar-title"><i class="fa fa-clipboard-check"></i> Điểm danh học sinh</div>
     </div>
-    <div class="page-body">
-
-    <div class="page-body">
+    <div class="page-body attendance-page-body">
 
       <div class="card">
         <div class="card-header">
-          <div style="display:flex;gap:16px;flex:1;flex-wrap:wrap;align-items:flex-end">
-            <div style="flex:1;min-width:200px">
-              <label style="display:block;margin-bottom:6px;font-weight:600;font-size:0.9rem"><i class="fa fa-school"></i> Lớp học</label>
+          <div class="attendance-filter">
+            <div class="attendance-filter-field">
+              <label><i class="fa fa-school"></i> Lớp học</label>
               <select id="classSelect" onchange="loadSchedules()" style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:0.95rem">
                 <option value="">-- Chọn lớp --</option>
               </select>
             </div>
-            <div style="flex:1;min-width:200px">
-              <label style="display:block;margin-bottom:6px;font-weight:600;font-size:0.9rem"><i class="fa fa-book-open"></i> Buổi học</label>
+            <div class="attendance-filter-field">
+              <label><i class="fa fa-book-open"></i> Buổi học</label>
               <select id="scheduleSelect" onchange="loadStudents()" disabled style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:0.95rem">
                 <option value="">-- Chọn buổi học --</option>
               </select>
             </div>
-            <div style="flex:1;min-width:200px">
-              <label style="display:block;margin-bottom:6px;font-weight:600;font-size:0.9rem"><i class="fa fa-calendar"></i> Ngày điểm danh</label>
-              <input type="date" id="attendanceDate" onchange="loadExistingAttendance()" style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:0.95rem" />
+            <div class="attendance-filter-field">
+              <label><i class="fa fa-calendar-week"></i> Tuần điểm danh</label>
+              <input type="date" id="weekStart" onchange="onWeekChanged()" style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:0.95rem" />
+            </div>
+            <div class="attendance-filter-field">
+              <label><i class="fa fa-calendar"></i> Ngày điểm danh</label>
+              <input type="date" id="attendanceDate" readonly style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:0.95rem;background:#f8f9fa" />
             </div>
           </div>
         </div>
@@ -241,20 +295,90 @@
         </div>
       </div>
 
+      <div class="card attendance-history-card" style="margin-top:20px">
+        <div class="card-header"><i class="fa fa-history"></i> Lịch sử điểm danh trong tuần</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Thứ</th><th>Ngày</th><th>Lớp</th><th>Môn học</th><th>Có mặt</th><th>Vắng</th><th>Muộn</th><th>Trạng thái</th></tr></thead>
+            <tbody id="attendanceHistory">
+              <tr><td colspan="8" style="text-align:center;color:#999">Chọn tuần và lớp để xem lịch sử</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
+  </div>
+</div>
+
+<div id="attendanceDetailModal" class="modal">
+  <div class="modal-content" style="max-width:760px">
+    <div class="modal-header">
+      <h3 id="attendanceDetailTitle">Chi tiết điểm danh</h3>
+      <button type="button" class="modal-close" onclick="closeModal('attendanceDetailModal')">&times;</button>
+    </div>
+    <div class="modal-body" id="attendanceDetailBody"></div>
   </div>
 </div>
 
 <script src="../js/api.js"></script>
 <script>
   if (!requireAuth()) throw new Error('Unauthorized');
+  if (!['ADMIN', 'ACADEMIC_AFFAIRS', 'TEACHER'].includes(getUser()?.role)) {
+    redirectToRoleHome();
+    throw new Error('Forbidden');
+  }
   renderUserInfo();
+  if (getUser()?.role === 'TEACHER' && window.location.pathname === '/admin/attendance.html') {
+    window.history.replaceState({}, '', '/teacher/attendance.html');
+  }
 
   let currentStudents = [];
   let attendanceData = {};
 
-  // Set today as default date
-  document.getElementById('attendanceDate').valueAsDate = new Date();
+  let currentSchedules = [];
+  const weekStartInput = document.getElementById('weekStart');
+  const today = new Date();
+  const monday = new Date(today);
+  const day = monday.getDay() || 7;
+  monday.setDate(monday.getDate() - day + 1);
+  weekStartInput.value = toDateInputValue(monday);
+
+  function toDateInputValue(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  function getAttendanceDate(schedule) {
+    const start = new Date(`${weekStartInput.value}T00:00:00`);
+    const offset = schedule.dayOfWeek === 1 ? 6 : schedule.dayOfWeek - 2;
+    start.setDate(start.getDate() + offset);
+    return toDateInputValue(start);
+  }
+
+  function onWeekChanged() {
+    if (!weekStartInput.value) return;
+    const selected = new Date(`${weekStartInput.value}T00:00:00`);
+    const day = selected.getDay() || 7;
+    selected.setDate(selected.getDate() - day + 1);
+    weekStartInput.value = toDateInputValue(selected);
+    updateSelectedScheduleDate();
+    loadHistory();
+  }
+
+  function updateSelectedScheduleDate() {
+    const schedule = currentSchedules.find(s => String(s.id) === document.getElementById('scheduleSelect').value);
+    document.getElementById('attendanceDate').value = schedule ? getAttendanceDate(schedule) : '';
+  }
+
+  function selectSchedule(scheduleId) {
+    const select = document.getElementById('scheduleSelect');
+    select.value = String(scheduleId);
+    updateSelectedScheduleDate();
+    loadStudents();
+  }
 
   async function loadClasses() {
     try {
@@ -283,12 +407,14 @@
     try {
       const resp = await api.schedules.getByClass(classId);
       const schedules = resp.data;
+      currentSchedules = schedules;
       
       schedules.forEach(s => {
         scheduleSelect.innerHTML += `
           <option value="${s.id}">${s.dayOfWeekText} - ${s.subject} (${s.startTime}-${s.endTime})</option>
         `;
       });
+      await loadHistory();
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -300,10 +426,12 @@
 
     if (!classId || !scheduleId) {
       document.getElementById('attendanceContainer').style.display = 'none';
+      document.getElementById('attendanceDate').value = '';
       return;
     }
 
     try {
+      updateSelectedScheduleDate();
       const resp = await api.students.byClass(classId);
       currentStudents = resp.data;
       attendanceData = {};
@@ -314,7 +442,7 @@
       });
 
       renderStudentList();
-      loadExistingAttendance();
+      await loadExistingAttendance();
       document.getElementById('attendanceContainer').style.display = 'block';
     } catch (err) {
       showToast(err.message, 'error');
@@ -340,7 +468,7 @@
 
       renderStudentList();
     } catch (err) {
-      console.log('No existing attendance data');
+      showToast(err.message, 'error');
     }
   }
 
@@ -430,11 +558,93 @@
         attendances: attendances
       });
       showToast('Lưu điểm danh thành công');
+      await loadHistory();
     } catch (err) {
       showToast(err.message, 'error');
     }
   }
 
+  async function loadHistory() {
+    const classId = document.getElementById('classSelect').value;
+    const body = document.getElementById('attendanceHistory');
+    if (!classId || !weekStartInput.value) {
+      body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999">Chọn tuần và lớp để xem lịch sử</td></tr>';
+      return;
+    }
+
+    const schedules = currentSchedules.length
+      ? currentSchedules
+      : (await api.schedules.getByClass(classId)).data;
+    const studentsResponse = await api.students.byClass(classId);
+    const studentsById = Object.fromEntries((studentsResponse.data || []).map(student => [student.id, student.fullName]));
+    const rows = await Promise.all(schedules.map(async schedule => {
+      const date = getAttendanceDate(schedule);
+      const response = await api.attendances.getByScheduleAndDate(schedule.id, date);
+      const records = response.data || [];
+      const count = status => records.filter(record => record.status === status).length;
+      return { schedule, date, records, studentsById, present: count('PRESENT'), absent: count('ABSENT'), late: count('LATE') };
+    }));
+
+    body.innerHTML = rows.length ? rows.map(({ schedule, date, records, present, absent, late }) => `
+      <tr>
+        <td>${schedule.dayOfWeekText}</td><td>${date}</td><td>${schedule.className}</td>
+        <td><button type="button" class="btn btn-link" onclick="selectSchedule(${schedule.id})">${schedule.subject}</button></td>
+        <td>${present}</td><td>${absent}</td><td>${late}</td>
+        <td>
+          <span class="badge ${records.length ? 'badge-success' : 'badge-warning'}">${records.length ? 'Đã lưu' : 'Chưa điểm danh'}</span>
+          ${records.length ? `
+            <button type="button" class="btn btn-sm btn-primary" style="margin-left:6px" onclick="showAttendanceDetail(${schedule.id}, '${date}')"><i class="fa fa-eye"></i> Chi tiết</button>
+            <button type="button" class="btn btn-sm btn-warning" style="margin-left:6px" onclick="editAttendance(${schedule.id}, '${date}')"><i class="fa fa-edit"></i> Sửa</button>
+          ` : ''}
+        </td>
+      </tr>
+    `).join('') : '<tr><td colspan="8" style="text-align:center;color:#999">Tuần này chưa có buổi học</td></tr>';
+  }
+
+  async function showAttendanceDetail(scheduleId, date) {
+    const schedule = currentSchedules.find(item => item.id === scheduleId);
+    if (!schedule) return;
+
+    const [attendanceResponse, studentsResponse] = await Promise.all([
+      api.attendances.getByScheduleAndDate(scheduleId, date),
+      api.students.byClass(schedule.classId)
+    ]);
+    const studentsById = Object.fromEntries((studentsResponse.data || []).map(student => [student.id, student.fullName]));
+    const records = attendanceResponse.data || [];
+    const names = status => records
+      .filter(record => record.status === status)
+      .map(record => studentsById[record.studentId] || record.studentName || `ID ${record.studentId}`);
+    const list = values => values.length ? `<ul>${values.map(name => `<li>${name}</li>`).join('')}</ul>` : '<p style="margin:0;color:#999">Không có</p>';
+
+    document.getElementById('attendanceDetailTitle').textContent =
+      `${schedule.className} - ${schedule.subject} (${date})`;
+    document.getElementById('attendanceDetailBody').innerHTML = `
+      <div class="attendance-detail-list">
+        <div class="attendance-detail-group"><h4><i class="fa fa-check-circle"></i> Có mặt (${names('PRESENT').length})</h4>${list(names('PRESENT'))}</div>
+        <div class="attendance-detail-group absent"><h4><i class="fa fa-times-circle"></i> Vắng (${names('ABSENT').length})</h4>${list(names('ABSENT'))}</div>
+        <div class="attendance-detail-group late"><h4><i class="fa fa-clock"></i> Muộn (${names('LATE').length})</h4>${list(names('LATE'))}</div>
+      </div>
+    `;
+    openModal('attendanceDetailModal');
+  }
+
+  async function editAttendance(scheduleId, date) {
+    const classId = document.getElementById('classSelect').value;
+    const scheduleSelect = document.getElementById('scheduleSelect');
+    scheduleSelect.value = String(scheduleId);
+    document.getElementById('attendanceDate').value = date;
+    updateSelectedScheduleDate();
+
+    try {
+      await loadStudents();
+      document.getElementById('attendanceContainer').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  document.getElementById('classSelect').addEventListener('change', loadHistory);
+  document.getElementById('scheduleSelect').addEventListener('change', updateSelectedScheduleDate);
   loadClasses();
 </script>
 </body>
