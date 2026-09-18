@@ -47,7 +47,7 @@ function getRoleLandingPath(role = getUser()?.role) {
         case 'ACADEMIC_AFFAIRS':
             return '/admin/dashboard.html';
         case 'MANAGER':
-            return '/admin/teachers.html';
+            return '/accountant/dashboard.html';
         case 'STUDENT':
             return '/user/dashboard.html';
         default:
@@ -153,6 +153,33 @@ const api = {
         delete:  (id)      => http('DELETE', `/teachers/${id}`),
     },
 
+    accounts: {
+        getAll: () => http('GET', '/user/accounts'),
+        create: (data) => http('POST', '/user/accounts', data),
+        update: (id, data) => http('PUT', `/user/accounts/${id}`, data),
+        delete: (id) => http('DELETE', `/user/accounts/${id}`),
+    },
+    archive: {
+        list: () => http('GET', '/archive'),
+        upload: (file) => { const form = new FormData(); form.append('file', file); return http('POST', '/archive', form); },
+        download: async (id, name) => {
+            const response = await fetch(`${API_BASE}/archive/${id}/download`, {
+                headers: { Authorization: `Bearer ${getToken()}` }
+            });
+            if (!response.ok) throw new Error('Không thể tải file');
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url; link.download = name; link.click();
+            URL.revokeObjectURL(url);
+        },
+    },
+    teachingSessions: {
+        getWeek: (from, to) => http('GET', `/teaching-sessions?from=${from}&to=${to}`),
+        getStats: (from, to) => http('GET', `/teaching-sessions/stats?from=${from}&to=${to}`),
+        update: (id, data) => http('PUT', `/teaching-sessions/${id}`, data),
+    },
+
     // Classes
     classes: {
         getAll:  ()        => http('GET', '/classes'),
@@ -181,6 +208,7 @@ const api = {
         getByStudent: (studentId) => http('GET', `/tuition-payments/student/${studentId}`),
         getByClass: (classId) => http('GET', `/tuition-payments/class/${classId}`),
         collect: (studentId, data) => http('POST', `/tuition-payments/student/${studentId}/collect`, data),
+        closeClass: (classId) => http('POST', `/tuition-payments/class/${classId}/close`),
     },
 
     // Schedules (Lịch học)
@@ -269,6 +297,8 @@ function renderRoleNavigation() {
             ['Lớp học', '/admin/classes.html', 'school'],
             ['Thời khóa biểu', '/admin/timetable.html', 'calendar'],
             ['Điểm danh', '/admin/attendance.html', 'check-circle'],
+            ['Quản lý tài khoản', '/admin/accounts.html', 'users-cog'],
+            ['Lịch dạy giáo viên', '/admin/teaching-schedule.html', 'chalkboard-teacher'],
             ['Bài đăng video', '/admin/posts.html', 'video']
         ],
         ACADEMIC_AFFAIRS: [
@@ -278,11 +308,15 @@ function renderRoleNavigation() {
             ['Lớp học', '/admin/classes.html', 'school'],
             ['Thời khóa biểu', '/admin/timetable.html', 'calendar'],
             ['Điểm danh', '/admin/attendance.html', 'check-circle']
+            ,['Lưu trữ', '/admin/archive.html', 'folder-open']
+            ,['Lịch dạy giáo viên', '/admin/teaching-schedule.html', 'chalkboard-teacher']
         ],
         MANAGER: [
             ['Học sinh', '/admin/students.html', 'user-graduate'],
             ['Giáo viên', '/admin/teachers.html', 'chalkboard-teacher'],
-            ['Thời khóa biểu', '/admin/timetable.html', 'calendar']
+            ['Thời khóa biểu', '/admin/timetable.html', 'calendar'],
+            ['Quản lý học phí', '/accountant/dashboard.html', 'money-bill-wave']
+            ,['Lưu trữ', '/admin/archive.html', 'folder-open']
         ],
         TEACHER: [
             ['Tổng quan', '/teacher/dashboard.html', 'home'],

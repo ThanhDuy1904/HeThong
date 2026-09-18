@@ -4,6 +4,7 @@ import fit.tedu.HeThong.dto.request.TuitionPaymentCollectRequest;
 import fit.tedu.HeThong.dto.response.ApiResponse;
 import fit.tedu.HeThong.dto.response.StudentResponse;
 import fit.tedu.HeThong.dto.response.TuitionPaymentResponse;
+import fit.tedu.HeThong.dto.response.ArchiveFileResponse;
 import fit.tedu.HeThong.entity.Student;
 import fit.tedu.HeThong.repository.StudentRepository;
 import fit.tedu.HeThong.service.TuitionPaymentService;
@@ -38,7 +39,9 @@ public class TuitionPaymentController {
     @GetMapping("/student/{studentId}")
     public ResponseEntity<ApiResponse<List<TuitionPaymentResponse>>> getByStudent(@PathVariable Long studentId) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        boolean elevated = auth != null && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ADMIN") || a.getAuthority().equals("ACCOUNTANT"));
+        boolean elevated = auth != null && auth.getAuthorities().stream().anyMatch(a ->
+                a.getAuthority().equals("ADMIN") || a.getAuthority().equals("ACCOUNTANT")
+                        || a.getAuthority().equals("MANAGER"));
         if (!elevated) {
             Student student = studentRepository.findByUsername(auth.getName())
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin học sinh"));
@@ -61,7 +64,8 @@ public class TuitionPaymentController {
             Authentication authentication) {
         try {
             boolean elevated = authentication != null && authentication.getAuthorities().stream()
-                    .anyMatch(a -> a.getAuthority().equals("ADMIN") || a.getAuthority().equals("ACCOUNTANT"));
+                    .anyMatch(a -> a.getAuthority().equals("ADMIN") || a.getAuthority().equals("ACCOUNTANT")
+                            || a.getAuthority().equals("MANAGER"));
             if (!elevated) {
                 return ResponseEntity.status(403).body(ApiResponse.error("Bạn không có quyền thu học phí"));
             }
@@ -70,5 +74,18 @@ public class TuitionPaymentController {
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
+    }
+
+    @PostMapping("/class/{classId}/close")
+        public ResponseEntity<ApiResponse<ArchiveFileResponse>> closeClass(@PathVariable Long classId, Authentication authentication) {
+            try {
+                boolean elevated = authentication != null && authentication.getAuthorities().stream()
+                        .anyMatch(a -> a.getAuthority().equals("ADMIN") || a.getAuthority().equals("ACCOUNTANT")
+                                || a.getAuthority().equals("MANAGER"));
+                if (!elevated) return ResponseEntity.status(403).body(ApiResponse.error("Bạn không có quyền chốt học phí"));
+                return ResponseEntity.ok(ApiResponse.ok("Đã lưu và reset học phí", tuitionPaymentService.closeClass(classId, authentication.getName())));
+            } catch (RuntimeException e) {
+                return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+            }
     }
 }

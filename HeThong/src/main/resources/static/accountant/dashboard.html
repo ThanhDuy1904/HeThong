@@ -51,8 +51,10 @@
               <option value="">Tất cả lớp</option>
             </select>
             <button class="btn btn-outline btn-sm" onclick="loadDebtTable()"><i class="fa fa-sync"></i> Tải lại</button>
+            <button class="btn btn-primary btn-sm" id="close-class-btn" onclick="closeSelectedClass()"><i class="fa fa-file-pdf"></i> Lưu toàn bộ học phí</button>
           </div>
         </div>
+        <div id="class-summary" style="display:flex;gap:18px;flex-wrap:wrap;padding:0 20px 16px;color:#475569"></div>
         <div class="table-wrap">
           <table>
             <thead>
@@ -104,7 +106,7 @@
 
   document.addEventListener('DOMContentLoaded', async () => {
     if (!requireAuth()) return;
-    if (getUser()?.role !== 'ACCOUNTANT') window.location.href = '../user/dashboard.html';
+    if (!['ACCOUNTANT', 'MANAGER'].includes(getUser()?.role)) window.location.href = '../user/dashboard.html';
     renderUserInfo();
     document.getElementById('top-username').textContent = getUser().fullName || getUser().username;
     await loadClassFilter();
@@ -144,12 +146,32 @@
       const classId = selectedClassId;
       const res = classId ? await api.students.byClass(classId) : await api.students.getAll();
       const students = (res.data || [])
-        .filter(s => Number(s.tuitionRemaining || 0) > 0)
         .sort((a, b) => Number(b.tuitionRemaining || 0) - Number(a.tuitionRemaining || 0));
+      const totalFee = students.reduce((sum, s) => sum + Number(s.classTuitionFee || 0), 0);
+      const totalPaid = students.reduce((sum, s) => sum + Number(s.tuitionPaidAmount || 0), 0);
+      const totalRemaining = students.reduce((sum, s) => sum + Number(s.tuitionRemaining || 0), 0);
+      const paidFull = students.filter(s => Number(s.tuitionRemaining || 0) === 0).length;
+      document.getElementById('class-summary').innerHTML = `
+        <span><strong>Tổng học phí:</strong> ${formatCurrency(totalFee)}</span>
+        <span><strong>Đã đóng:</strong> ${formatCurrency(totalPaid)}</span>
+        <span><strong>Còn nợ:</strong> ${formatCurrency(totalRemaining)}</span>
+        <span><strong>Đã đóng đủ:</strong> ${paidFull}/${students.length}</span>`;
+      document.getElementById('close-class-btn').disabled = !classId || paidFull !== students.length || students.length === 0;
       const tbody = document.getElementById('debt-table-body');
       if (!students.length) {
         tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#aaa;padding:24px">Không có công nợ</td></tr>';
         return;
+      }
+
+      async function closeSelectedClass() {
+        if (!selectedClassId) return;
+        if (!confirm('Chỉ được lưu khi tất cả học sinh đã đóng đủ. Tiếp tục lưu PDF và reset học phí?')) return;
+        try {
+          const result = await api.tuitionPayments.closeClass(selectedClassId);
+          showToast(`Đã lưu ${result.data?.originalName || 'phiếu học phí'} vào lưu trữ`, 'success');
+          await loadStats();
+          await loadDebtTable();
+        } catch (e) { showToast(e.message, 'error'); }
       }
       tbody.innerHTML = students.map((s, i) => `
         <tr data-id="${s.id}" data-name="${encodeURIComponent(s.fullName || '')}" data-class-name="${encodeURIComponent(s.className || '—')}" data-remaining="${s.tuitionRemaining || 0}">
@@ -158,8 +180,9 @@
           <td>${s.className || '—'}</td>
           <td>${formatCurrency(s.classTuitionFee)}</td>
           <td>${formatCurrency(s.tuitionPaidAmount)}</td>
-          <td><strong style="color:#f44">${formatCurrency(s.tuitionRemaining)}</strong></td>
-          <td><button class="btn btn-primary btn-sm" onclick="openCollectModal(this)"><i class="fa fa-hand-holding-dollar"></i> Thu tiền</button></td>
+          <td><strong style="color:${Number(s.tuitionRemaining || 0) === 0 ? '#16a34a' : '#f44'}">${formatCurrency(s.tuitionRemaining)}</strong></td>
+          <td>${Number(s.tuitionRemaining || 0) === 0 ? '<span class="badge badge-success">Đã đóng đủ</span>' : '<button class="btn btn-primary btn-sm" onclick="openCollectModal(this)"><i class="fa fa-hand-holding-dollar"></i> Thu tiền</button>'}
+          <button class="btn btn-outline btn-sm" onclick="printInvoice(this)" data-fee="${s.classTuitionFee || 0}" data-paid="${s.tuitionPaidAmount || 0}" data-remaining="${s.tuitionRemaining || 0}"><i class="fa fa-print"></i></button></td>
         </tr>
       `).join('');
     } catch (e) {
@@ -180,6 +203,16 @@
     document.getElementById('collect-note').value = '';
     document.getElementById('collect-alert').innerHTML = '';
     openModal('collect-modal');
+  }
+
+  function printInvoice(button) {
+    const row = button.closest('tr');
+    const esc = (value) => String(value || '—').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const printer = getUser()?.fullName || getUser()?.username || '—';
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Hóa đơn học phí</title><style>body{font-family:Arial;max-width:700px;margin:40px auto;color:#172033}h1{text-align:center}table{width:100%;border-collapse:collapse;margin-top:25px}td{padding:12px;border-bottom:1px solid #ddd}.value{text-align:right;font-weight:bold}.note{text-align:center;margin-top:35px;color:#64748b}</style></head><body><h1>PHIẾU THU HỌC PHÍ</h1><p>Ngày in: ${new Date().toLocaleString('vi-VN')}</p><p>Người in: <strong>${esc(printer)}</strong></p><p>Học sinh: <strong>${esc(row.dataset.name ? decodeURIComponent(row.dataset.name) : row.cells[1].textContent)}</strong></p><p>Lớp: ${esc(row.dataset.className ? decodeURIComponent(row.dataset.className) : row.cells[2].textContent)}</p><table><tr><td>Tổng học phí</td><td class="value">${formatCurrency(button.dataset.fee)}</td></tr><tr><td>Đã nộp</td><td class="value">${formatCurrency(button.dataset.paid)}</td></tr><tr><td>Còn nợ</td><td class="value">${formatCurrency(button.dataset.remaining)}</td></tr></table><p class="note">TEDU - Hệ thống quản lý học sinh</p></body></html>`;
+    const popup = window.open('', '_blank', 'width=760,height=700');
+    if (!popup) { showToast('Trình duyệt đã chặn cửa sổ in', 'error'); return; }
+    popup.document.write(html); popup.document.close(); popup.focus(); popup.print();
   }
 
   async function submitCollect() {

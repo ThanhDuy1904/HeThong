@@ -1,6 +1,8 @@
 package fit.tedu.HeThong.controller;
 
 import fit.tedu.HeThong.dto.request.ChangePasswordRequest;
+import fit.tedu.HeThong.dto.request.AdminUserRequest;
+import fit.tedu.HeThong.dto.response.AdminUserResponse;
 import fit.tedu.HeThong.dto.request.UpdateProfileRequest;
 import fit.tedu.HeThong.dto.response.ApiResponse;
 import fit.tedu.HeThong.dto.response.UserProfileResponse;
@@ -12,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/user")
@@ -19,6 +22,41 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final UserService userService;
+
+    @GetMapping("/accounts")
+    public ResponseEntity<ApiResponse<List<AdminUserResponse>>> getAccounts() {
+        return ResponseEntity.ok(ApiResponse.ok(userService.getAllAccounts()));
+    }
+
+    @PostMapping("/accounts")
+    public ResponseEntity<ApiResponse<AdminUserResponse>> createAccount(
+            @Valid @RequestBody AdminUserRequest request) {
+        try {
+            return ResponseEntity.ok(ApiResponse.ok("Tạo tài khoản thành công", userService.createAccount(request)));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
+    @PutMapping("/accounts/{id}")
+    public ResponseEntity<ApiResponse<AdminUserResponse>> updateAccount(
+            @PathVariable Long id, @Valid @RequestBody AdminUserRequest request) {
+        try {
+            return ResponseEntity.ok(ApiResponse.ok("Cập nhật tài khoản thành công", userService.updateAccount(id, request)));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/accounts/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteAccount(@PathVariable Long id) {
+        try {
+            userService.deleteAccount(id);
+            return ResponseEntity.ok(ApiResponse.ok("Xóa tài khoản thành công", null));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        }
+    }
 
     @GetMapping("/profile")
     public ResponseEntity<ApiResponse<UserProfileResponse>> getProfile() {

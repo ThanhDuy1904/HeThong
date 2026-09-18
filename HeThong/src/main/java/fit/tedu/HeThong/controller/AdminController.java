@@ -15,7 +15,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyAuthority('ADMIN','ACADEMIC_AFFAIRS')")
+@PreAuthorize("hasAnyAuthority('ADMIN','ACADEMIC_AFFAIRS','MANAGER')")
 public class AdminController {
 
     private final StudentService studentService;

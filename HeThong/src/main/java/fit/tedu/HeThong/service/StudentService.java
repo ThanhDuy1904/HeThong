@@ -64,7 +64,11 @@ public class StudentService {
     }
 
     public List<StudentResponse> getByClass(Long classId) {
-        return studentRepository.findByAnyClassId(classId).stream().map(this::toResponse).collect(Collectors.toList());
+        ClassRoom selectedClass = classRoomRepository.findById(classId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy lớp học"));
+        return studentRepository.findByAnyClassId(classId).stream()
+                .map(student -> toResponse(student, selectedClass))
+                .collect(Collectors.toList());
     }
 
     public List<StudentResponse> getByClassForTeacher(Long classId, String username) {
@@ -340,6 +344,19 @@ public class StudentService {
                 .username(s.getUser() != null ? s.getUser().getUsername() : null)
                 .createdAt(s.getCreatedAt())
                 .build();
+    }
+
+    private StudentResponse toResponse(Student s, ClassRoom selectedClass) {
+        StudentResponse response = toResponse(s);
+        BigDecimal fee = selectedClass.getTuitionFee() == null ? BigDecimal.ZERO : selectedClass.getTuitionFee();
+        BigDecimal paid = s.getTuitionPaidAmount() == null ? BigDecimal.ZERO : s.getTuitionPaidAmount();
+        BigDecimal remaining = fee.subtract(paid).max(BigDecimal.ZERO);
+        response.setClassId(selectedClass.getId());
+        response.setClassName(selectedClass.getClassName());
+        response.setClassTuitionFee(fee);
+        response.setTuitionRemaining(remaining);
+        response.setTuitionPaidFull(remaining.compareTo(BigDecimal.ZERO) == 0);
+        return response;
     }
 
     private void assignClasses(Student student, StudentRequest req) {

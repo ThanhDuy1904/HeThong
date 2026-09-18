@@ -2,9 +2,11 @@ package fit.tedu.HeThong.service;
 
 import fit.tedu.HeThong.dto.response.TuitionPaymentResponse;
 import fit.tedu.HeThong.dto.response.StudentResponse;
+import fit.tedu.HeThong.dto.response.ArchiveFileResponse;
 import fit.tedu.HeThong.entity.Student;
 import fit.tedu.HeThong.entity.TuitionPayment;
 import fit.tedu.HeThong.entity.User;
+import fit.tedu.HeThong.entity.ClassRoom;
 import fit.tedu.HeThong.repository.StudentRepository;
 import fit.tedu.HeThong.repository.TuitionPaymentRepository;
 import fit.tedu.HeThong.repository.UserRepository;
@@ -15,6 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.time.LocalDateTime;
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +28,7 @@ public class TuitionPaymentService {
     private final TuitionPaymentRepository tuitionPaymentRepository;
     private final StudentRepository studentRepository;
     private final UserRepository userRepository;
+    private final ArchiveService archiveService;
 
     @Transactional
     public void recordPaymentChange(Long studentId, BigDecimal amountDelta, BigDecimal balanceAfter, String note, String username) {
@@ -87,6 +93,59 @@ public class TuitionPaymentService {
 
     public List<TuitionPaymentResponse> getByClassId(Long classId) {
         return tuitionPaymentRepository.findByStudentClassRoomIdOrderByCreatedAtDesc(classId).stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    @Transactional
+    public ArchiveFileResponse closeClass(Long classId, String username) {
+        List<Student> students = studentRepository.findByAnyClassId(classId);
+        if (students.isEmpty()) throw new RuntimeException("Lớp chưa có học sinh");
+        String className = students.stream().flatMap(s -> s.getClasses().stream())
+                .filter(c -> c.getId().equals(classId)).map(ClassRoom::getClassName).findFirst()
+                .orElseGet(() -> students.get(0).getClassRoom().getClassName());
+        ClassRoom selectedClass = students.stream().flatMap(s -> s.getClasses().stream())
+                .filter(c -> c.getId().equals(classId)).findFirst()
+                .orElse(students.get(0).getClassRoom());
+        BigDecimal fee = selectedClass == null || selectedClass.getTuitionFee() == null
+                ? BigDecimal.ZERO : selectedClass.getTuitionFee();
+        for (Student student : students) {
+            BigDecimal paid = student.getTuitionPaidAmount() == null ? BigDecimal.ZERO : student.getTuitionPaidAmount();
+            if (fee.subtract(paid).compareTo(BigDecimal.ZERO) > 0) {
+                throw new RuntimeException("Chưa thể lưu: vẫn còn học sinh chưa đóng đủ học phí");
+            }
+        }
+        String timestamp = LocalDateTime.now().toString().replace(':', '-');
+        String fileName = "hocphi_" + className.replaceAll("[^a-zA-Z0-9_-]", "_") + "_" + timestamp + ".pdf";
+        byte[] pdf = buildReceiptPdf(className, fee, students);
+        ArchiveFileResponse archived = archiveService.saveGenerated(fileName, pdf, "application/pdf", username);
+        students.forEach(student -> {
+            student.setTuitionPaidAmount(BigDecimal.ZERO);
+            student.setTuitionPaidFull(false);
+        });
+        studentRepository.saveAll(students);
+        return archived;
+    }
+
+    private byte[] buildReceiptPdf(String className, BigDecimal fee, List<Student> students) {
+        StringBuilder text = new StringBuilder("PHIEU CHOT HOC PHI\n");
+        text.append("Lop: ").append(className).append("\n");
+        text.append("Hoc phi moi hoc sinh: ").append(fee).append(" VND\n");
+        text.append("Thoi gian: ").append(LocalDateTime.now()).append("\n\n");
+        for (Student student : students) text.append(student.getFullName()).append(" - DA DONG DU\n");
+        String escaped = text.toString().replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+                .replace("\n", ") Tj 0 -16 Td (");
+        String body = "BT /F1 11 Tf 50 780 Td (" + escaped + ") Tj ET";
+        String[] objects = {"<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+                "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+                "<< /Length " + body.getBytes(StandardCharsets.US_ASCII).length + " >>\nstream\n" + body + "\nendstream",
+                "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"};
+        StringBuilder pdf = new StringBuilder("%PDF-1.4\n");
+        int[] offsets = new int[objects.length + 1];
+        for (int i = 0; i < objects.length; i++) { offsets[i + 1] = pdf.length(); pdf.append(i + 1).append(" 0 obj\n").append(objects[i]).append("\nendobj\n"); }
+        int xref = pdf.length();
+        pdf.append("xref\n0 ").append(objects.length + 1).append("\n0000000000 65535 f \n");
+        for (int i = 1; i < offsets.length; i++) pdf.append(String.format(Locale.ROOT, "%010d 00000 n \n", offsets[i]));
+        pdf.append("trailer\n<< /Size ").append(offsets.length).append(" /Root 1 0 R >>\nstartxref\n").append(xref).append("\n%%EOF");
+        return pdf.toString().getBytes(StandardCharsets.US_ASCII);
     }
 
     private TuitionPaymentResponse toResponse(TuitionPayment payment) {

@@ -123,7 +123,7 @@
           </div>
           <div class="form-group">
             <label>Lớp học (có thể chọn nhiều)</label>
-            <select id="s-classId" multiple size="4"></select>
+            <div id="s-classIds" style="display:grid;gap:6px;max-height:150px;overflow:auto"></div>
           </div>
           <div class="form-group full">
             <label>Địa chỉ</label>
@@ -218,9 +218,8 @@
       const classSelect = document.getElementById('class-select');
       classSelect.innerHTML = '<option value="">-- Chọn lớp --</option>' +
         allClasses.map(c => `<option value="${c.id}">${c.className}</option>`).join('');
-      const sel = document.getElementById('s-classId');
-      sel.innerHTML = '<option value="">-- Chọn lớp --</option>' +
-        allClasses.map(c => `<option value="${c.id}">${c.className}</option>`).join('');
+      const sel = document.getElementById('s-classIds');
+      sel.innerHTML = allClasses.map(c => `<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="student-class" value="${c.id}"> ${c.className}</label>`).join('');
       renderClassGrid();
 
       if (savedClassId && allClasses.some(c => String(c.id) === String(savedClassId))) {
@@ -342,6 +341,7 @@
     document.getElementById('student-id').value = '';
     document.getElementById('modal-alert').innerHTML = '';
     document.getElementById('account-section').style.display = '';
+    document.querySelectorAll('input[name="student-class"]').forEach(o => o.checked = false);
     openModal('student-modal');
   }
 
@@ -355,7 +355,7 @@
       document.getElementById('s-dob').value = s.dob ? s.dob.substring(0,10) : '';
       document.getElementById('s-gender').value = s.gender || '';
       document.getElementById('s-phone').value = s.phone || '';
-      Array.from(document.getElementById('s-classId').options).forEach(o => o.selected = (s.classIds || [s.classId]).map(String).includes(o.value));
+      document.querySelectorAll('input[name="student-class"]').forEach(o => o.checked = (s.classIds || [s.classId]).map(String).includes(o.value));
       document.getElementById('s-address').value = s.address || '';
       document.getElementById('s-parentName').value = s.parentName || '';
       document.getElementById('s-parentPhone').value = s.parentPhone || '';
@@ -399,14 +399,14 @@
       dob:         document.getElementById('s-dob').value || null,
       gender:      document.getElementById('s-gender').value,
       phone:       document.getElementById('s-phone').value,
-      classIds:    Array.from(document.getElementById('s-classId').selectedOptions).map(o => Number(o.value)),
-      classId:     Array.from(document.getElementById('s-classId').selectedOptions).map(o => o.value)[0] || null,
+      classIds:    Array.from(document.querySelectorAll('input[name="student-class"]:checked')).map(o => Number(o.value)),
+      classId:     Number(document.querySelector('input[name="student-class"]:checked')?.value) || null,
       address:     document.getElementById('s-address').value,
       parentName:  document.getElementById('s-parentName').value,
       parentPhone: document.getElementById('s-parentPhone').value,
       status:      document.getElementById('s-status').value,
       tuitionPaidAmount: document.getElementById('s-tuitionPaidAmount').value || 0,
-      tuitionPaidFull: Number(document.getElementById('s-tuitionPaidAmount').value || 0) >= Number((allClasses.find(c => String(c.id) === String(document.getElementById('s-classId').value)) || {}).tuitionFee || 0),
+      tuitionPaidFull: Number(document.getElementById('s-tuitionPaidAmount').value || 0) >= Number((allClasses.find(c => String(c.id) === String(document.querySelector('input[name="student-class"]:checked')?.value)) || {}).tuitionFee || 0),
     };
     if (!id) {
       payload.username = document.getElementById('s-username').value.trim() || null;
