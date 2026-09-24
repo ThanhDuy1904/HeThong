@@ -24,6 +24,11 @@ public class ArchiveService {
     public List<ArchiveFileResponse> list(String username) {
         return repository.findByUploadedByOrderByCreatedAtDesc(username).stream().map(this::response).collect(Collectors.toList());
     }
+    public List<ArchiveFileResponse> listForAdmin() {
+        return repository.findAll(org.springframework.data.domain.Sort.by(
+                org.springframework.data.domain.Sort.Direction.DESC, "createdAt"))
+                .stream().map(this::response).collect(Collectors.toList());
+    }
     public ArchiveFileResponse upload(MultipartFile file, String username) {
         if (file == null || file.isEmpty()) throw new RuntimeException("Vui lòng chọn file");
         try {
@@ -45,6 +50,7 @@ public class ArchiveService {
             Files.write(target, content, StandardOpenOption.CREATE_NEW);
             return response(repository.save(ArchiveFile.builder().originalName(fileName).storedName(stored)
                     .contentType(contentType).size(content.length).uploadedBy(username)
+                    .sharedWithAdmin(true)
                     .createdAt(LocalDateTime.now()).build()));
         } catch (Exception e) {
             throw new RuntimeException("Không thể lưu file vào lưu trữ", e);

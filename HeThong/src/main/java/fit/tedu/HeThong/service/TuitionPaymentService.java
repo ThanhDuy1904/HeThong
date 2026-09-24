@@ -7,9 +7,11 @@ import fit.tedu.HeThong.entity.Student;
 import fit.tedu.HeThong.entity.TuitionPayment;
 import fit.tedu.HeThong.entity.User;
 import fit.tedu.HeThong.entity.ClassRoom;
+import fit.tedu.HeThong.entity.StudentClassTuition;
 import fit.tedu.HeThong.repository.StudentRepository;
 import fit.tedu.HeThong.repository.TuitionPaymentRepository;
 import fit.tedu.HeThong.repository.UserRepository;
+import fit.tedu.HeThong.repository.StudentClassTuitionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +22,7 @@ import java.util.stream.Collectors;
 import java.time.LocalDateTime;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +32,7 @@ public class TuitionPaymentService {
     private final StudentRepository studentRepository;
     private final UserRepository userRepository;
     private final ArchiveService archiveService;
+    private final StudentClassTuitionRepository studentClassTuitionRepository;
 
     @Transactional
     public void recordPaymentChange(Long studentId, BigDecimal amountDelta, BigDecimal balanceAfter, String note, String username) {
@@ -54,7 +58,7 @@ public class TuitionPaymentService {
     }
 
     @Transactional
-    public StudentResponse collectPayment(Long studentId, BigDecimal amount, String note, String username) {
+    public StudentResponse collectPayment(Long studentId, Long classId, BigDecimal amount, String note, String username) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new RuntimeException("Số tiền thu phải lớn hơn 0");
         }
@@ -62,14 +66,19 @@ public class TuitionPaymentService {
         Student student = studentRepository.findByIdForUpdate(studentId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy học sinh!"));
 
-        BigDecimal classFee = student.getClassRoom() != null && student.getClassRoom().getTuitionFee() != null
-                ? student.getClassRoom().getTuitionFee()
+        ClassRoom classRoom = classId == null ? student.getClassRoom() : student.getClasses().stream()
+                .filter(item -> item.getId().equals(classId)).findFirst().orElseThrow(() -> new RuntimeException("Học sinh không thuộc lớp này"));
+        BigDecimal classFee = classRoom != null && classRoom.getTuitionFee() != null
+                ? classRoom.getTuitionFee()
                 : BigDecimal.ZERO;
         if (classFee.compareTo(BigDecimal.ZERO) <= 0) {
             throw new RuntimeException("Lớp học chưa thiết lập học phí");
         }
 
-        BigDecimal currentPaid = student.getTuitionPaidAmount() != null ? student.getTuitionPaidAmount() : BigDecimal.ZERO;
+        StudentClassTuition tuition = studentClassTuitionRepository.findByStudentIdAndClassRoomId(studentId, classRoom.getId())
+                .orElseGet(() -> studentClassTuitionRepository.save(StudentClassTuition.builder()
+                        .student(student).classRoom(classRoom).paidAmount(BigDecimal.ZERO).build()));
+        BigDecimal currentPaid = tuition.getPaidAmount() == null ? BigDecimal.ZERO : tuition.getPaidAmount();
         BigDecimal remaining = classFee.subtract(currentPaid);
         if (remaining.compareTo(BigDecimal.ZERO) < 0) {
             remaining = BigDecimal.ZERO;
@@ -79,12 +88,17 @@ public class TuitionPaymentService {
         }
 
         BigDecimal newPaid = currentPaid.add(amount);
-        student.setTuitionPaidAmount(newPaid);
-        student.setTuitionPaidFull(newPaid.compareTo(classFee) >= 0);
+        tuition.setPaidAmount(newPaid);
+        studentClassTuitionRepository.save(tuition);
+        if (student.getClassRoom() != null && student.getClassRoom().getId().equals(classRoom.getId())) {
+            student.setTuitionPaidAmount(newPaid);
+            student.setTuitionPaidFull(newPaid.compareTo(classFee) >= 0);
+        }
         Student saved = studentRepository.save(student);
 
-        recordPaymentChange(saved.getId(), amount, toRemaining(saved), note != null && !note.isBlank() ? note : "Thu học phí", username);
-        return toStudentResponse(saved);
+        recordPaymentChange(saved.getId(), amount, classFee.subtract(newPaid).max(BigDecimal.ZERO),
+                note != null && !note.isBlank() ? note : "Thu học phí", username);
+        return toStudentResponse(saved, classRoom, newPaid);
     }
 
     public List<TuitionPaymentResponse> getByStudentId(Long studentId) {
@@ -96,7 +110,7 @@ public class TuitionPaymentService {
     }
 
     @Transactional
-    public ArchiveFileResponse closeClass(Long classId, String username) {
+    public ArchiveFileResponse closeClass(Long classId, String requestedFileName, String username) {
         List<Student> students = studentRepository.findByAnyClassId(classId);
         if (students.isEmpty()) throw new RuntimeException("Lớp chưa có học sinh");
         String className = students.stream().flatMap(s -> s.getClasses().stream())
@@ -108,18 +122,30 @@ public class TuitionPaymentService {
         BigDecimal fee = selectedClass == null || selectedClass.getTuitionFee() == null
                 ? BigDecimal.ZERO : selectedClass.getTuitionFee();
         for (Student student : students) {
-            BigDecimal paid = student.getTuitionPaidAmount() == null ? BigDecimal.ZERO : student.getTuitionPaidAmount();
+            BigDecimal paid = studentClassTuitionRepository.findByStudentIdAndClassRoomId(student.getId(), classId)
+                    .map(StudentClassTuition::getPaidAmount)
+                    .orElse(student.getClassRoom() != null && student.getClassRoom().getId().equals(classId)
+                            ? Optional.ofNullable(student.getTuitionPaidAmount()).orElse(BigDecimal.ZERO)
+                            : BigDecimal.ZERO);
             if (fee.subtract(paid).compareTo(BigDecimal.ZERO) > 0) {
                 throw new RuntimeException("Chưa thể lưu: vẫn còn học sinh chưa đóng đủ học phí");
             }
         }
-        String timestamp = LocalDateTime.now().toString().replace(':', '-');
-        String fileName = "hocphi_" + className.replaceAll("[^a-zA-Z0-9_-]", "_") + "_" + timestamp + ".pdf";
+        String fileName = requestedFileName.replaceAll("[^a-zA-Z0-9_-]", "_").trim();
+        if (fileName.isBlank()) throw new RuntimeException("Tên file không hợp lệ");
+        if (!fileName.toLowerCase(Locale.ROOT).endsWith(".pdf")) fileName += ".pdf";
         byte[] pdf = buildReceiptPdf(className, fee, students);
         ArchiveFileResponse archived = archiveService.saveGenerated(fileName, pdf, "application/pdf", username);
         students.forEach(student -> {
-            student.setTuitionPaidAmount(BigDecimal.ZERO);
-            student.setTuitionPaidFull(false);
+            studentClassTuitionRepository.findByStudentIdAndClassRoomId(student.getId(), classId)
+                    .ifPresent(tuition -> {
+                        tuition.setPaidAmount(BigDecimal.ZERO);
+                        studentClassTuitionRepository.save(tuition);
+                    });
+            if (student.getClassRoom() != null && student.getClassRoom().getId().equals(classId)) {
+                student.setTuitionPaidAmount(BigDecimal.ZERO);
+                student.setTuitionPaidFull(false);
+            }
         });
         studentRepository.saveAll(students);
         return archived;
@@ -193,6 +219,19 @@ public class TuitionPaymentService {
                 .username(s.getUser() != null ? s.getUser().getUsername() : null)
                 .createdAt(s.getCreatedAt())
                 .build();
+    }
+
+    private StudentResponse toStudentResponse(Student s, ClassRoom classRoom, BigDecimal paid) {
+        BigDecimal fee = classRoom.getTuitionFee() == null ? BigDecimal.ZERO : classRoom.getTuitionFee();
+        BigDecimal remaining = fee.subtract(paid).max(BigDecimal.ZERO);
+        StudentResponse response = toStudentResponse(s);
+        response.setClassId(classRoom.getId());
+        response.setClassName(classRoom.getClassName());
+        response.setClassTuitionFee(fee);
+        response.setTuitionPaidAmount(paid);
+        response.setTuitionRemaining(remaining);
+        response.setTuitionPaidFull(remaining.compareTo(BigDecimal.ZERO) == 0);
+        return response;
     }
 
     private BigDecimal toRemaining(Student s) {

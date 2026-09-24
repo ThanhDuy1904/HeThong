@@ -53,6 +53,7 @@
             <button class="btn btn-outline btn-sm" onclick="loadDebtTable()"><i class="fa fa-sync"></i> Tải lại</button>
             <button class="btn btn-primary btn-sm" id="close-class-btn" onclick="closeSelectedClass()"><i class="fa fa-file-pdf"></i> Lưu toàn bộ học phí</button>
           </div>
+          <input id="student-filter" type="search" placeholder="Tìm theo tên học sinh..." oninput="renderDebtTable()" style="margin:12px 20px;width:min(360px,calc(100% - 40px))">
         </div>
         <div id="class-summary" style="display:flex;gap:18px;flex-wrap:wrap;padding:0 20px 16px;color:#475569"></div>
         <div class="table-wrap">
@@ -103,6 +104,7 @@
 <script>
   let collectStudentId = null;
   let selectedClassId = localStorage.getItem('accountant_class_filter') || '';
+  let debtStudents = [];
 
   document.addEventListener('DOMContentLoaded', async () => {
     if (!requireAuth()) return;
@@ -145,8 +147,17 @@
       localStorage.setItem('accountant_class_filter', selectedClassId);
       const classId = selectedClassId;
       const res = classId ? await api.students.byClass(classId) : await api.students.getAll();
-      const students = (res.data || [])
+      debtStudents = (res.data || [])
         .sort((a, b) => Number(b.tuitionRemaining || 0) - Number(a.tuitionRemaining || 0));
+      renderDebtTable();
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }
+
+  function renderDebtTable() {
+      const students = debtStudents.filter(s => (s.fullName || '').toLocaleLowerCase('vi').includes(
+        (document.getElementById('student-filter').value || '').trim().toLocaleLowerCase('vi')));
       const totalFee = students.reduce((sum, s) => sum + Number(s.classTuitionFee || 0), 0);
       const totalPaid = students.reduce((sum, s) => sum + Number(s.tuitionPaidAmount || 0), 0);
       const totalRemaining = students.reduce((sum, s) => sum + Number(s.tuitionRemaining || 0), 0);
@@ -156,23 +167,13 @@
         <span><strong>Đã đóng:</strong> ${formatCurrency(totalPaid)}</span>
         <span><strong>Còn nợ:</strong> ${formatCurrency(totalRemaining)}</span>
         <span><strong>Đã đóng đủ:</strong> ${paidFull}/${students.length}</span>`;
-      document.getElementById('close-class-btn').disabled = !classId || paidFull !== students.length || students.length === 0;
+      document.getElementById('close-class-btn').disabled = !selectedClassId || paidFull !== students.length || students.length === 0;
       const tbody = document.getElementById('debt-table-body');
       if (!students.length) {
         tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#aaa;padding:24px">Không có công nợ</td></tr>';
         return;
       }
 
-      async function closeSelectedClass() {
-        if (!selectedClassId) return;
-        if (!confirm('Chỉ được lưu khi tất cả học sinh đã đóng đủ. Tiếp tục lưu PDF và reset học phí?')) return;
-        try {
-          const result = await api.tuitionPayments.closeClass(selectedClassId);
-          showToast(`Đã lưu ${result.data?.originalName || 'phiếu học phí'} vào lưu trữ`, 'success');
-          await loadStats();
-          await loadDebtTable();
-        } catch (e) { showToast(e.message, 'error'); }
-      }
       tbody.innerHTML = students.map((s, i) => `
         <tr data-id="${s.id}" data-name="${encodeURIComponent(s.fullName || '')}" data-class-name="${encodeURIComponent(s.className || '—')}" data-remaining="${s.tuitionRemaining || 0}">
           <td>${i + 1}</td>
@@ -185,9 +186,19 @@
           <button class="btn btn-outline btn-sm" onclick="printInvoice(this)" data-fee="${s.classTuitionFee || 0}" data-paid="${s.tuitionPaidAmount || 0}" data-remaining="${s.tuitionRemaining || 0}"><i class="fa fa-print"></i></button></td>
         </tr>
       `).join('');
-    } catch (e) {
-      showToast(e.message, 'error');
-    }
+  }
+
+  async function closeSelectedClass() {
+    if (!selectedClassId) return;
+    const requestedName = prompt('Nhập tên file lưu trữ (không cần nhập .pdf):', `hocphi_${selectedClassId}`);
+    if (requestedName === null || !requestedName.trim()) return;
+    if (!confirm('Chỉ được lưu khi tất cả học sinh đã đóng đủ. Tiếp tục lưu PDF và reset học phí?')) return;
+    try {
+      const result = await api.tuitionPayments.closeClass(selectedClassId, requestedName.trim());
+      showToast(`Đã lưu ${result.data?.originalName || 'phiếu học phí'} vào lưu trữ`, 'success');
+      await loadStats();
+      await loadDebtTable();
+    } catch (e) { showToast(e.message, 'error'); }
   }
 
   function openCollectModal(button) {
@@ -220,7 +231,7 @@
     const amount = Number(document.getElementById('collect-amount').value || 0);
     const note = document.getElementById('collect-note').value.trim();
     try {
-      await api.tuitionPayments.collect(collectStudentId, { amount, note });
+      await api.tuitionPayments.collect(collectStudentId, { amount, note, classId: selectedClassId ? Number(selectedClassId) : null });
       showToast('Đã ghi nhận thu học phí');
       closeModal('collect-modal');
       await loadStats();

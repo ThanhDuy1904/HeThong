@@ -70,20 +70,23 @@ public class TuitionPaymentController {
                 return ResponseEntity.status(403).body(ApiResponse.error("Bạn không có quyền thu học phí"));
             }
             return ResponseEntity.ok(ApiResponse.ok("Thu học phí thành công",
-                    tuitionPaymentService.collectPayment(studentId, request.getAmount(), request.getNote(), authentication.getName())));
+                    tuitionPaymentService.collectPayment(studentId, request.getClassId(), request.getAmount(),
+                            request.getNote(), authentication.getName())));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
     }
 
     @PostMapping("/class/{classId}/close")
-        public ResponseEntity<ApiResponse<ArchiveFileResponse>> closeClass(@PathVariable Long classId, Authentication authentication) {
+        public ResponseEntity<ApiResponse<ArchiveFileResponse>> closeClass(@PathVariable Long classId,
+                @RequestParam String fileName, Authentication authentication) {
             try {
                 boolean elevated = authentication != null && authentication.getAuthorities().stream()
                         .anyMatch(a -> a.getAuthority().equals("ADMIN") || a.getAuthority().equals("ACCOUNTANT")
                                 || a.getAuthority().equals("MANAGER"));
                 if (!elevated) return ResponseEntity.status(403).body(ApiResponse.error("Bạn không có quyền chốt học phí"));
-                return ResponseEntity.ok(ApiResponse.ok("Đã lưu và reset học phí", tuitionPaymentService.closeClass(classId, authentication.getName())));
+                return ResponseEntity.ok(ApiResponse.ok("Đã lưu và reset học phí",
+                        tuitionPaymentService.closeClass(classId, fileName, authentication.getName())));
             } catch (RuntimeException e) {
                 return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
             }

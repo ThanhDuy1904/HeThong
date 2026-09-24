@@ -208,7 +208,7 @@ const api = {
         getByStudent: (studentId) => http('GET', `/tuition-payments/student/${studentId}`),
         getByClass: (classId) => http('GET', `/tuition-payments/class/${classId}`),
         collect: (studentId, data) => http('POST', `/tuition-payments/student/${studentId}/collect`, data),
-        closeClass: (classId) => http('POST', `/tuition-payments/class/${classId}/close`),
+        closeClass: (classId, fileName) => http('POST', `/tuition-payments/class/${classId}/close?fileName=${encodeURIComponent(fileName)}`),
     },
 
     // Schedules (Lịch học)
@@ -302,7 +302,6 @@ function renderRoleNavigation() {
             ['Bài đăng video', '/admin/posts.html', 'video']
         ],
         ACADEMIC_AFFAIRS: [
-            ['Tổng quan', '/admin/dashboard.html', 'tachometer-alt'],
             ['Học sinh', '/admin/students.html', 'user-graduate'],
             ['Giáo viên', '/admin/teachers.html', 'chalkboard-teacher'],
             ['Lớp học', '/admin/classes.html', 'school'],
@@ -312,9 +311,6 @@ function renderRoleNavigation() {
             ,['Lịch dạy giáo viên', '/admin/teaching-schedule.html', 'chalkboard-teacher']
         ],
         MANAGER: [
-            ['Học sinh', '/admin/students.html', 'user-graduate'],
-            ['Giáo viên', '/admin/teachers.html', 'chalkboard-teacher'],
-            ['Thời khóa biểu', '/admin/timetable.html', 'calendar'],
             ['Quản lý học phí', '/accountant/dashboard.html', 'money-bill-wave']
             ,['Lưu trữ', '/admin/archive.html', 'folder-open']
         ],
@@ -323,7 +319,8 @@ function renderRoleNavigation() {
             ['Học sinh', '/teacher/students.html', 'user-graduate'],
             ['Lớp học', '/teacher/classes.html', 'school'],
             ['Thời khóa biểu', '/teacher/timetable.html', 'calendar'],
-            ['Điểm danh', '/teacher/attendance.html', 'check-circle']
+            ['Điểm danh', '/teacher/attendance.html', 'check-circle'],
+            ['Lưu trữ', '/admin/archive.html', 'folder-open']
         ]
     };
     const menu = menus[role];

@@ -13,6 +13,10 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.LinkedHashSet;
 import java.util.Objects;
+import java.util.Optional;
+import java.text.Collator;
+import java.util.Comparator;
+import java.util.Locale;
 import java.util.stream.Collectors;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.BufferedReader;
@@ -32,9 +36,11 @@ public class StudentService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final TuitionPaymentService tuitionPaymentService;
+    private final StudentClassTuitionRepository studentClassTuitionRepository;
 
     public List<StudentResponse> getAll() {
-        return studentRepository.findAll().stream().map(this::toResponse).collect(Collectors.toList());
+        return studentRepository.findAll().stream().map(this::toResponse)
+                .sorted(lastNameComparator()).collect(Collectors.toList());
     }
 
     public StudentResponse getById(Long id) {
@@ -60,14 +66,20 @@ public class StudentService {
     }
 
     public List<StudentResponse> search(String keyword) {
-        return studentRepository.searchByKeyword(keyword).stream().map(this::toResponse).collect(Collectors.toList());
+        return studentRepository.searchByKeyword(keyword).stream().map(this::toResponse)
+                .sorted(lastNameComparator()).collect(Collectors.toList());
     }
 
     public List<StudentResponse> getByClass(Long classId) {
         ClassRoom selectedClass = classRoomRepository.findById(classId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy lớp học"));
         return studentRepository.findByAnyClassId(classId).stream()
-                .map(student -> toResponse(student, selectedClass))
+                .map(student -> toResponse(student, selectedClass,
+                        studentClassTuitionRepository.findByStudentIdAndClassRoomId(student.getId(), classId)
+                                .map(StudentClassTuition::getPaidAmount)
+                                .orElse(student.getClassRoom() != null && student.getClassRoom().getId().equals(classId)
+                                        ? Optional.ofNullable(student.getTuitionPaidAmount()).orElse(BigDecimal.ZERO)
+                                        : BigDecimal.ZERO)))
                 .collect(Collectors.toList());
     }
 
@@ -127,6 +139,8 @@ public class StudentService {
         }
 
         Student saved = studentRepository.save(student);
+        initializeClassTuition(saved);
+        syncLegacyTuition(saved);
         if (saved.getTuitionPaidAmount() != null && saved.getTuitionPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
             tuitionPaymentService.recordPaymentChange(saved.getId(), saved.getTuitionPaidAmount(),
                 toResponse(saved).getTuitionRemaining(), "Khởi tạo học phí", null);
@@ -192,7 +206,10 @@ public class StudentService {
                 if (classId == null && row[4] != null && !row[4].isBlank()) {
                     classId = classRoomRepository.findAll().stream()
                             .filter(c -> c.getClassName().equalsIgnoreCase(row[4].trim()))
-                            .map(ClassRoom::getId).findFirst().orElse(null);
+                            .map(ClassRoom::getId).findFirst().orElseGet(() -> {
+                                ClassRoom newClass = ClassRoom.builder().className(row[4].trim()).build();
+                                return classRoomRepository.save(newClass).getId();
+                            });
                 }
                 request.setClassId(classId);
                 create(request);
@@ -235,6 +252,7 @@ public class StudentService {
         }
 
         Student saved = studentRepository.save(student);
+        initializeClassTuition(saved);
         BigDecimal newPaid = saved.getTuitionPaidAmount() != null ? saved.getTuitionPaidAmount() : BigDecimal.ZERO;
         BigDecimal delta = newPaid.subtract(oldPaid);
         if (delta.compareTo(BigDecimal.ZERO) != 0) {
@@ -346,10 +364,23 @@ public class StudentService {
                 .build();
     }
 
+    private Comparator<StudentResponse> lastNameComparator() {
+        Collator collator = Collator.getInstance(new Locale("vi", "VN"));
+        return Comparator.comparing((StudentResponse s) -> {
+            String name = s.getFullName() == null ? "" : s.getFullName().trim();
+            return name.isBlank() ? "" : name.substring(name.lastIndexOf(' ') + 1);
+        }, collator).thenComparing(StudentResponse::getFullName, Comparator.nullsLast(collator));
+    }
+
     private StudentResponse toResponse(Student s, ClassRoom selectedClass) {
+        return toResponse(s, selectedClass,
+                studentClassTuitionRepository.findByStudentIdAndClassRoomId(s.getId(), selectedClass.getId())
+                        .map(StudentClassTuition::getPaidAmount).orElse(BigDecimal.ZERO));
+    }
+
+    private StudentResponse toResponse(Student s, ClassRoom selectedClass, BigDecimal paid) {
         StudentResponse response = toResponse(s);
         BigDecimal fee = selectedClass.getTuitionFee() == null ? BigDecimal.ZERO : selectedClass.getTuitionFee();
-        BigDecimal paid = s.getTuitionPaidAmount() == null ? BigDecimal.ZERO : s.getTuitionPaidAmount();
         BigDecimal remaining = fee.subtract(paid).max(BigDecimal.ZERO);
         response.setClassId(selectedClass.getId());
         response.setClassName(selectedClass.getClassName());
@@ -357,6 +388,27 @@ public class StudentService {
         response.setTuitionRemaining(remaining);
         response.setTuitionPaidFull(remaining.compareTo(BigDecimal.ZERO) == 0);
         return response;
+    }
+
+    private void initializeClassTuition(Student student) {
+        for (ClassRoom classRoom : student.getClasses()) {
+            studentClassTuitionRepository.findByStudentIdAndClassRoomId(student.getId(), classRoom.getId())
+                    .orElseGet(() -> studentClassTuitionRepository.save(StudentClassTuition.builder()
+                            .student(student).classRoom(classRoom)
+                            .paidAmount(student.getClassRoom() != null && student.getClassRoom().getId().equals(classRoom.getId())
+                                    ? Optional.ofNullable(student.getTuitionPaidAmount()).orElse(BigDecimal.ZERO)
+                                    : BigDecimal.ZERO)
+                            .build()));
+        }
+    }
+
+    private void syncLegacyTuition(Student student) {
+        if (student.getClassRoom() == null) return;
+        studentClassTuitionRepository.findByStudentIdAndClassRoomId(student.getId(), student.getClassRoom().getId())
+                .ifPresent(tuition -> {
+                    tuition.setPaidAmount(Optional.ofNullable(student.getTuitionPaidAmount()).orElse(BigDecimal.ZERO));
+                    studentClassTuitionRepository.save(tuition);
+                });
     }
 
     private void assignClasses(Student student, StudentRequest req) {

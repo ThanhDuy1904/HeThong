@@ -79,7 +79,7 @@
         <div class="table-wrap">
           <table>
             <thead>
-              <tr><th>#</th><th>Họ tên</th><th>Ngày sinh</th><th>Giới tính</th><th>Lớp</th><th>Học phí lớp</th><th>Đã đóng</th><th>Còn lại</th><th>SĐT</th><th>Trạng thái</th><th>Thao tác</th></tr>
+              <tr><th>#</th><th>Họ tên</th><th>Giới tính</th><th>Lớp</th><th>Học phí lớp</th><th>Đã đóng</th><th>Còn lại</th><th>SĐT</th><th>SĐT phụ huynh</th><th>Trạng thái</th><th>Thao tác</th></tr>
             </thead>
             <tbody id="students-table-body"></tbody>
           </table>
@@ -206,7 +206,7 @@
     if (!classId) return;
     try {
       const res = await api.students.byClass(classId);
-      currentStudents = res.data || [];
+      currentStudents = (res.data || []).sort(compareByLastName);
       renderTable(filterStudents(false));
     } catch (e) { showToast(e.message, 'error'); }
   }
@@ -302,6 +302,12 @@
     return filtered;
   }
 
+  function compareByLastName(a, b) {
+    const last = value => (value || '').trim().split(/\s+/).pop().toLocaleLowerCase('vi');
+    return last(a.fullName).localeCompare(last(b.fullName), 'vi') ||
+      (a.fullName || '').localeCompare(b.fullName || '', 'vi');
+  }
+
   function renderTable(students) {
     const tbody = document.getElementById('students-table-body');
     const info  = document.getElementById('table-info');
@@ -314,13 +320,13 @@
       <tr>
         <td>${i+1}</td>
         <td><strong>${s.fullName}</strong></td>
-        <td>${s.dob ? new Date(s.dob).toLocaleDateString('vi-VN') : '—'}</td>
         <td>${s.gender || '—'}</td>
         <td>${s.className || '—'}</td>
         <td>${formatCurrency(s.classTuitionFee)}</td>
         <td>${formatCurrency(s.tuitionPaidAmount)}</td>
         <td>${formatCurrency(s.tuitionRemaining)}</td>
         <td>${s.phone || '—'}</td>
+        <td>${s.parentPhone || '—'}</td>
         <td><span class="badge ${s.status === 'ACTIVE' ? 'badge-success' : s.status === 'GRADUATED' ? 'badge-info' : 'badge-danger'}">
           ${s.status === 'ACTIVE' ? 'Đang học' : s.status === 'GRADUATED' ? 'Tốt nghiệp' : 'Nghỉ học'}</span></td>
         <td>
@@ -423,7 +429,8 @@
         showToast('Thêm học sinh thành công!');
       }
       closeModal('student-modal');
-      loadStudents();
+      await loadStudents();
+      await loadClasses();
     } catch (e) {
       document.getElementById('modal-alert').innerHTML = `<div class="alert alert-error">${e.message}</div>`;
     }
@@ -439,6 +446,7 @@
       const result = await api.students.importFile(form);
       showToast(result.message || `Đã nhập ${result.data} học sinh`);
       document.getElementById('student-import-file').value = '';
+      await loadClasses();
       if (currentClassId) await loadStudents();
     } catch (e) {
       showToast(e.message, 'error');
@@ -450,7 +458,8 @@
       try {
         await api.students.delete(id);
         showToast('Đã xóa học sinh!');
-        loadStudents();
+        await loadStudents();
+        await loadClasses();
       } catch (e) { showToast(e.message, 'error'); }
     });
   }

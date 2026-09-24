@@ -20,6 +20,9 @@ public class ArchiveFile {
     private long size;
     @Column(nullable = false, length = 100)
     private String uploadedBy;
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean sharedWithAdmin = false;
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 }

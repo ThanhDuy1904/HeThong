@@ -12,11 +12,14 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 @RestController @RequestMapping("/api/archive") @RequiredArgsConstructor
-@PreAuthorize("hasAnyAuthority('ADMIN','ACADEMIC_AFFAIRS','MANAGER')")
+@PreAuthorize("hasAnyAuthority('ADMIN','ACADEMIC_AFFAIRS','MANAGER','TEACHER')")
 public class ArchiveController {
     private final ArchiveService service;
     @GetMapping public ApiResponse<List<ArchiveFileResponse>> list(java.security.Principal principal) {
-        return ApiResponse.ok(service.list(principal.getName()));
+        boolean admin = org.springframework.security.core.context.SecurityContextHolder.getContext()
+                .getAuthentication().getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ADMIN"));
+        return ApiResponse.ok(admin ? service.listForAdmin() : service.list(principal.getName()));
     }
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<ArchiveFileResponse> upload(@RequestPart("file") MultipartFile file, java.security.Principal principal) {
@@ -25,7 +28,10 @@ public class ArchiveController {
     @GetMapping("/{id}/download")
     public ResponseEntity<Resource> download(@PathVariable Long id) {
         ArchiveFile f = service.get(id);
-        if (!f.getUploadedBy().equals(currentUsername())) {
+        boolean admin = org.springframework.security.core.context.SecurityContextHolder.getContext()
+                .getAuthentication().getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ADMIN"));
+        if (!admin && !f.getUploadedBy().equals(currentUsername())) {
             throw new org.springframework.security.access.AccessDeniedException("Bạn không có quyền tải tài liệu này");
         }
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(f.getContentType()))

@@ -153,8 +153,14 @@
     const kw = document.getElementById('search-input').value.trim();
     try {
       const res = await api.teachers.getAll(kw);
-      renderTable(res.data);
+      renderTable((res.data || []).sort(compareByLastName));
     } catch (e) { showToast(e.message, 'error'); }
+  }
+
+  function compareByLastName(a, b) {
+    const last = value => (value || '').trim().split(/\s+/).pop().toLocaleLowerCase('vi');
+    return last(a.fullName).localeCompare(last(b.fullName), 'vi') ||
+      (a.fullName || '').localeCompare(b.fullName || '', 'vi');
   }
 
   function renderTable(teachers) {
@@ -231,7 +237,7 @@
         showToast('Thêm giáo viên thành công!');
       }
       closeModal('teacher-modal');
-      loadTeachers();
+      await loadTeachers();
     } catch (e) {
       document.getElementById('modal-alert').innerHTML = `<div class="alert alert-error">${e.message}</div>`;
     }
@@ -242,7 +248,7 @@
       try {
         await api.teachers.delete(id);
         showToast('Đã xóa giáo viên!');
-        loadTeachers();
+        await loadTeachers();
       } catch (e) { showToast(e.message, 'error'); }
     });
   }

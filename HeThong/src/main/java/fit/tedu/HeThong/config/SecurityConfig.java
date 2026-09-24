@@ -73,7 +73,7 @@ public class SecurityConfig {
                 // Admin-only endpoints
                 .requestMatchers("/api/admin/**").hasAnyAuthority("ADMIN","ACADEMIC_AFFAIRS","MANAGER")
                 .requestMatchers("/api/user/accounts/**").hasAuthority("ADMIN")
-                .requestMatchers("/api/archive/**").hasAnyAuthority("ADMIN","ACADEMIC_AFFAIRS","MANAGER")
+                .requestMatchers("/api/archive/**").hasAnyAuthority("ADMIN","ACADEMIC_AFFAIRS","MANAGER","TEACHER")
                 .requestMatchers("/api/tuition-payments/class/*/close").hasAnyAuthority("ADMIN","ACCOUNTANT","MANAGER")
                 .requestMatchers("/api/teaching-sessions/**").hasAnyAuthority("ADMIN","ACADEMIC_AFFAIRS")
                 // Students - Only admin and teacher can view list, students cannot

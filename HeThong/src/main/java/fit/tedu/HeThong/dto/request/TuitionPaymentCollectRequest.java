@@ -13,5 +13,7 @@ public class TuitionPaymentCollectRequest {
     @DecimalMin(value = "0.01")
     private BigDecimal amount;
 
+    private Long classId;
+
     private String note;
 }

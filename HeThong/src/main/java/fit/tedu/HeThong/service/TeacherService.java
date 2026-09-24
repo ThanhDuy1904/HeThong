@@ -11,6 +11,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
+import java.text.Collator;
+import java.util.Comparator;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -22,7 +25,8 @@ public class TeacherService {
     private final PasswordEncoder passwordEncoder;
 
     public List<TeacherResponse> getAll() {
-        return teacherRepository.findAll().stream().map(this::toResponse).collect(Collectors.toList());
+        return teacherRepository.findAll().stream().map(this::toResponse)
+                .sorted(lastNameComparator()).collect(Collectors.toList());
     }
 
     public TeacherResponse getById(Long id) {
@@ -36,7 +40,16 @@ public class TeacherService {
     }
 
     public List<TeacherResponse> search(String keyword) {
-        return teacherRepository.searchByKeyword(keyword).stream().map(this::toResponse).collect(Collectors.toList());
+        return teacherRepository.searchByKeyword(keyword).stream().map(this::toResponse)
+                .sorted(lastNameComparator()).collect(Collectors.toList());
+    }
+
+    private Comparator<TeacherResponse> lastNameComparator() {
+        Collator collator = Collator.getInstance(new Locale("vi", "VN"));
+        return Comparator.comparing((TeacherResponse t) -> {
+            String name = t.getFullName() == null ? "" : t.getFullName().trim();
+            return name.isBlank() ? "" : name.substring(name.lastIndexOf(' ') + 1);
+        }, collator).thenComparing(TeacherResponse::getFullName, Comparator.nullsLast(collator));
     }
 
     @Transactional
