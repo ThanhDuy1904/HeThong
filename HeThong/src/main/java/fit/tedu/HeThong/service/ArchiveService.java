@@ -65,6 +65,18 @@ public class ArchiveService {
         } catch (Exception e) { throw new RuntimeException(e.getMessage(), e); }
     }
     public ArchiveFile get(Long id) { return repository.findById(id).orElseThrow(() -> new RuntimeException("Không tìm thấy file")); }
+    public void delete(Long id, String username, boolean admin) {
+        ArchiveFile file = get(id);
+        if (!admin && !file.getUploadedBy().equals(username)) {
+            throw new org.springframework.security.access.AccessDeniedException("Bạn không có quyền xóa tài liệu này");
+        }
+        try {
+            Files.deleteIfExists(Paths.get(directory).toAbsolutePath().resolve(file.getStoredName()));
+            repository.delete(file);
+        } catch (Exception e) {
+            throw new RuntimeException("Không thể xóa file lưu trữ", e);
+        }
+    }
     private String sanitize(String name) { return name == null ? "file" : name.replaceAll("[^a-zA-Z0-9._-]", "_"); }
     private ArchiveFileResponse response(ArchiveFile f) { return ArchiveFileResponse.builder().id(f.getId()).originalName(f.getOriginalName()).contentType(f.getContentType()).size(f.getSize()).uploadedBy(f.getUploadedBy()).createdAt(f.getCreatedAt()).build(); }
 }

@@ -68,6 +68,19 @@ public class ClassController {
         return ResponseEntity.ok(ApiResponse.ok("Xóa lớp thành công", null));
     }
 
+    @PatchMapping("/{id}/archive")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ACADEMIC_AFFAIRS')")
+    public ResponseEntity<ApiResponse<ClassResponse>> setArchived(
+            @PathVariable Long id, @RequestParam boolean archived) {
+        try {
+            return ResponseEntity.ok(ApiResponse.ok(
+                    archived ? "Đã lưu trữ lớp" : "Đã mở lại lớp",
+                    classService.setArchived(id, archived)));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
     @PutMapping("/{id}/tuition-fee")
     @PreAuthorize("hasAnyAuthority('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ApiResponse<ClassResponse>> updateTuitionFee(

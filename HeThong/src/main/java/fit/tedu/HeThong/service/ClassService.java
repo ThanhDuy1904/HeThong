@@ -29,6 +29,7 @@ public class ClassService {
         Teacher teacher = teacherRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin giáo viên"));
         return classRoomRepository.findByTeacherId(teacher.getId()).stream()
+                .filter(c -> !c.isArchived())
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
@@ -67,6 +68,7 @@ public class ClassService {
     public ClassResponse update(Long id, ClassRequest req) {
         ClassRoom cls = classRoomRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy lớp!"));
+        ensureEditable(cls);
         cls.setClassName(req.getClassName());
         cls.setGrade(req.getGrade());
         cls.setSchoolYear(req.getSchoolYear());
@@ -83,13 +85,25 @@ public class ClassService {
     public ClassResponse updateTuitionFee(Long id, BigDecimal tuitionFee) {
         ClassRoom cls = classRoomRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy lớp!"));
+        ensureEditable(cls);
         cls.setTuitionFee(tuitionFee);
         return toResponse(classRoomRepository.save(cls));
     }
 
     @Transactional
     public void delete(Long id) {
-        classRoomRepository.deleteById(id);
+        ClassRoom cls = classRoomRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy lớp!"));
+        ensureEditable(cls);
+        classRoomRepository.delete(cls);
+    }
+
+    @Transactional
+    public ClassResponse setArchived(Long id, boolean archived) {
+        ClassRoom cls = classRoomRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy lớp!"));
+        cls.setArchived(archived);
+        return toResponse(classRoomRepository.save(cls));
     }
 
     public long countAll() { return classRoomRepository.count(); }
@@ -105,7 +119,14 @@ public class ClassService {
                 .teacherId(c.getTeacher() != null ? c.getTeacher().getId() : null)
                 .teacherName(c.getTeacher() != null ? c.getTeacher().getFullName() : null)
                 .studentCount(studentCount)
+                .archived(c.isArchived())
                 .createdAt(c.getCreatedAt())
                 .build();
+    }
+
+    private void ensureEditable(ClassRoom cls) {
+        if (cls.isArchived()) {
+            throw new IllegalStateException("Lớp đã lưu trữ, không thể sửa hoặc xóa");
+        }
     }
 }

@@ -79,14 +79,15 @@ public class TuitionPaymentController {
 
     @PostMapping("/class/{classId}/close")
         public ResponseEntity<ApiResponse<ArchiveFileResponse>> closeClass(@PathVariable Long classId,
-                @RequestParam String fileName, Authentication authentication) {
+                    @RequestParam String fileName, @RequestParam(defaultValue = "pdf") String format,
+                    Authentication authentication) {
             try {
                 boolean elevated = authentication != null && authentication.getAuthorities().stream()
                         .anyMatch(a -> a.getAuthority().equals("ADMIN") || a.getAuthority().equals("ACCOUNTANT")
                                 || a.getAuthority().equals("MANAGER"));
                 if (!elevated) return ResponseEntity.status(403).body(ApiResponse.error("Bạn không có quyền chốt học phí"));
-                return ResponseEntity.ok(ApiResponse.ok("Đã lưu và reset học phí",
-                        tuitionPaymentService.closeClass(classId, fileName, authentication.getName())));
+                return ResponseEntity.ok(ApiResponse.ok("Đã lưu bảng tổng hợp học phí",
+                        tuitionPaymentService.closeClass(classId, fileName, format, authentication.getName())));
             } catch (RuntimeException e) {
                 return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
             }

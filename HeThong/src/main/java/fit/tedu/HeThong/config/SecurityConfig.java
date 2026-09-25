@@ -74,6 +74,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/admin/**").hasAnyAuthority("ADMIN","ACADEMIC_AFFAIRS","MANAGER")
                 .requestMatchers("/api/user/accounts/**").hasAuthority("ADMIN")
                 .requestMatchers("/api/archive/**").hasAnyAuthority("ADMIN","ACADEMIC_AFFAIRS","MANAGER","TEACHER")
+                .requestMatchers("/api/revenue/**").hasAnyAuthority("ADMIN","MANAGER")
+                .requestMatchers("/api/expenses/**").hasAnyAuthority("ADMIN","MANAGER")
                 .requestMatchers("/api/tuition-payments/class/*/close").hasAnyAuthority("ADMIN","ACCOUNTANT","MANAGER")
                 .requestMatchers("/api/teaching-sessions/**").hasAnyAuthority("ADMIN","ACADEMIC_AFFAIRS")
                 // Students - Only admin and teacher can view list, students cannot
@@ -96,6 +98,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.PUT,    "/api/classes/*/tuition-fee").hasAnyAuthority("ADMIN","ACADEMIC_AFFAIRS","ACCOUNTANT")
                 .requestMatchers(HttpMethod.PUT,    "/api/classes/**").hasAuthority("ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/api/classes/**").hasAuthority("ADMIN")
+                .requestMatchers(HttpMethod.PATCH, "/api/classes/*/archive").hasAnyAuthority("ADMIN","ACADEMIC_AFFAIRS")
                 // Tuition payments - students view own history, accountant/admin manage class histories
                 .requestMatchers(HttpMethod.GET, "/api/tuition-payments/me").hasAnyAuthority("STUDENT")
                 .requestMatchers(HttpMethod.GET, "/api/tuition-payments/student/**").hasAnyAuthority("ADMIN","ACCOUNTANT","MANAGER","STUDENT")

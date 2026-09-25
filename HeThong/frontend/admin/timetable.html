@@ -157,7 +157,7 @@
   async function loadClasses() {
     try {
       const resp = await api.classes.getAll();
-      const classes = resp.data;
+      const classes = (resp.data || []).filter(c => !c.archived);
       const select = document.getElementById('classSelect');
       const modalSelect = document.getElementById('schedule-classId');
       

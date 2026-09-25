@@ -162,6 +162,17 @@ const api = {
     archive: {
         list: () => http('GET', '/archive'),
         upload: (file) => { const form = new FormData(); form.append('file', file); return http('POST', '/archive', form); },
+        viewUrl: (id) => `${API_BASE}/archive/${id}/view`,
+        delete: (id) => http('DELETE', `/archive/${id}`),
+        view: async (id) => {
+            const response = await fetch(`${API_BASE}/archive/${id}/view`, {
+                headers: { Authorization: `Bearer ${getToken()}` }
+            });
+            if (!response.ok) throw new Error('Không thể xem file');
+            const url = URL.createObjectURL(await response.blob());
+            window.open(url, '_blank');
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
+        },
         download: async (id, name) => {
             const response = await fetch(`${API_BASE}/archive/${id}/download`, {
                 headers: { Authorization: `Bearer ${getToken()}` }
@@ -188,6 +199,7 @@ const api = {
         update:  (id, data)=> http('PUT', `/classes/${id}`, data),
         updateTuitionFee: (id, tuitionFee) => http('PUT', `/classes/${id}/tuition-fee?tuitionFee=${encodeURIComponent(tuitionFee)}`),
         delete:  (id)      => http('DELETE', `/classes/${id}`),
+        archive: (id, archived = true) => http('PATCH', `/classes/${id}/archive?archived=${archived}`),
     },
 
     posts: {
@@ -208,7 +220,30 @@ const api = {
         getByStudent: (studentId) => http('GET', `/tuition-payments/student/${studentId}`),
         getByClass: (classId) => http('GET', `/tuition-payments/class/${classId}`),
         collect: (studentId, data) => http('POST', `/tuition-payments/student/${studentId}/collect`, data),
-        closeClass: (classId, fileName) => http('POST', `/tuition-payments/class/${classId}/close?fileName=${encodeURIComponent(fileName)}`),
+        closeClass: (classId, fileName, format = 'pdf') => http('POST', `/tuition-payments/class/${classId}/close?fileName=${encodeURIComponent(fileName)}&format=${format}`),
+    },
+    revenue: {
+        report: (schoolYear, year, month) => {
+            const params = new URLSearchParams();
+            if (schoolYear) params.set('schoolYear', schoolYear);
+            if (year) params.set('year', year);
+            if (month) params.set('month', month);
+            return http('GET', `/revenue?${params.toString()}`);
+        },
+        expenses: {
+            list: () => http('GET', '/expenses'),
+            available: () => http('GET', '/expenses/available'),
+            create: (data) => http('POST', '/expenses', data),
+            delete: (id) => http('DELETE', `/expenses/${id}`),
+            imageUrl: (id) => `${API_BASE}/expenses/${id}/image`,
+            viewImage: async (id) => {
+                const response = await fetch(`${API_BASE}/expenses/${id}/image`, { headers: { Authorization: `Bearer ${getToken()}` } });
+                if (!response.ok) throw new Error('Không thể xem hình ảnh');
+                const url = URL.createObjectURL(await response.blob());
+                window.open(url, '_blank');
+                setTimeout(() => URL.revokeObjectURL(url), 60000);
+            },
+        },
     },
 
     // Schedules (Lịch học)
@@ -298,6 +333,9 @@ function renderRoleNavigation() {
             ['Thời khóa biểu', '/admin/timetable.html', 'calendar'],
             ['Điểm danh', '/admin/attendance.html', 'check-circle'],
             ['Quản lý tài khoản', '/admin/accounts.html', 'users-cog'],
+            ['Lưu trữ', '/admin/archive.html', 'folder-open'],
+            ['Doanh thu', '/admin/revenue.html', 'chart-bar'],
+            ['Chi tiêu', '/admin/expenses.html', 'receipt'],
             ['Lịch dạy giáo viên', '/admin/teaching-schedule.html', 'chalkboard-teacher'],
             ['Bài đăng video', '/admin/posts.html', 'video']
         ],
@@ -313,6 +351,8 @@ function renderRoleNavigation() {
         MANAGER: [
             ['Quản lý học phí', '/accountant/dashboard.html', 'money-bill-wave']
             ,['Lưu trữ', '/admin/archive.html', 'folder-open']
+            ,['Doanh thu', '/admin/revenue.html', 'chart-bar']
+            ,['Chi tiêu', '/admin/expenses.html', 'receipt']
         ],
         TEACHER: [
             ['Tổng quan', '/teacher/dashboard.html', 'home'],

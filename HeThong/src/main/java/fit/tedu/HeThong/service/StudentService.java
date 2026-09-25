@@ -225,8 +225,13 @@ public class StudentService {
     public StudentResponse update(Long id, StudentRequest req) {
         Student student = studentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy học sinh!"));
+        ensureEditable(student);
 
-        BigDecimal oldPaid = student.getTuitionPaidAmount() != null ? student.getTuitionPaidAmount() : BigDecimal.ZERO;
+        Long selectedClassId = req.getClassId() != null ? req.getClassId()
+                : student.getClassRoom() != null ? student.getClassRoom().getId() : null;
+        BigDecimal oldPaid = selectedClassId == null ? BigDecimal.ZERO
+                : studentClassTuitionRepository.findByStudentIdAndClassRoomId(id, selectedClassId)
+                        .map(StudentClassTuition::getPaidAmount).orElse(BigDecimal.ZERO);
         student.setFullName(req.getFullName());
         student.setDob(req.getDob());
         student.setGender(req.getGender());
@@ -254,6 +259,26 @@ public class StudentService {
         Student saved = studentRepository.save(student);
         initializeClassTuition(saved);
         BigDecimal newPaid = saved.getTuitionPaidAmount() != null ? saved.getTuitionPaidAmount() : BigDecimal.ZERO;
+        if (selectedClassId != null && req.getTuitionPaidAmount() != null) {
+            ClassRoom selectedClass = classRoomRepository.findById(selectedClassId)
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy lớp học"));
+            StudentClassTuition classTuition = studentClassTuitionRepository
+                    .findByStudentIdAndClassRoomId(id, selectedClassId)
+                    .orElseGet(() -> StudentClassTuition.builder()
+                            .student(saved).classRoom(selectedClass).paidAmount(BigDecimal.ZERO).build());
+            newPaid = req.getTuitionPaidAmount();
+            BigDecimal fee = selectedClass.getTuitionFee() == null ? BigDecimal.ZERO : selectedClass.getTuitionFee();
+            if (newPaid.compareTo(BigDecimal.ZERO) < 0 || newPaid.compareTo(fee) > 0) {
+                throw new RuntimeException("Số tiền đã đóng không hợp lệ");
+            }
+            classTuition.setPaidAmount(newPaid);
+            studentClassTuitionRepository.save(classTuition);
+            if (saved.getClassRoom() != null && saved.getClassRoom().getId().equals(selectedClassId)) {
+                saved.setTuitionPaidAmount(newPaid);
+                saved.setTuitionPaidFull(newPaid.compareTo(fee) >= 0);
+                studentRepository.save(saved);
+            }
+        }
         BigDecimal delta = newPaid.subtract(oldPaid);
         if (delta.compareTo(BigDecimal.ZERO) != 0) {
             tuitionPaymentService.recordPaymentChange(saved.getId(), delta, toResponse(saved).getTuitionRemaining(),
@@ -266,6 +291,7 @@ public class StudentService {
     public void delete(Long id) {
         Student student = studentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy học sinh!"));
+        ensureEditable(student);
         
         // Delete linked user account if exists
         User user = student.getUser();
@@ -280,6 +306,7 @@ public class StudentService {
     public StudentResponse removeFromClass(Long id) {
         Student student = studentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy học sinh!"));
+        ensureEditable(student);
         student.setClassRoom(null);
         student.getClasses().clear();
         return toResponse(studentRepository.save(student));
@@ -328,6 +355,13 @@ public class StudentService {
         }
 
         student.setTuitionPaidAmount(paid);
+    }
+
+    private void ensureEditable(Student student) {
+        if (student.getClasses().stream().anyMatch(ClassRoom::isArchived)
+                || (student.getClassRoom() != null && student.getClassRoom().isArchived())) {
+            throw new IllegalStateException("Học sinh thuộc lớp đã lưu trữ, chỉ được xem");
+        }
     }
 
     private StudentResponse toResponse(Student s) {

@@ -43,7 +43,7 @@ public class ScheduleService {
 
     public List<ScheduleResponse> getSchedulesByClass(Long classId) {
         return scheduleRepository.findByClassRoomIdOrderByDayOfWeekAscStartTimeAsc(classId)
-                .stream()
+                .stream().filter(schedule -> !schedule.getClassRoom().isArchived())
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
@@ -62,7 +62,7 @@ public class ScheduleService {
 
     public List<ScheduleResponse> getSchedulesByTeacher(Long teacherId) {
         return scheduleRepository.findByTeacherIdOrderByDayOfWeekAscStartTimeAsc(teacherId)
-                .stream()
+                .stream().filter(schedule -> !schedule.getClassRoom().isArchived())
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
@@ -95,6 +95,7 @@ public class ScheduleService {
     public ScheduleResponse create(ScheduleRequest request) {
         ClassRoom classRoom = classRoomRepository.findById(request.getClassId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy lớp học"));
+        ensureEditable(classRoom);
 
         Teacher teacher = null;
         if (request.getTeacherId() != null) {
@@ -123,6 +124,7 @@ public class ScheduleService {
 
         ClassRoom classRoom = classRoomRepository.findById(request.getClassId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy lớp học"));
+        ensureEditable(classRoom);
 
         Teacher teacher = null;
         if (request.getTeacherId() != null) {
@@ -147,7 +149,14 @@ public class ScheduleService {
         if (!scheduleRepository.existsById(id)) {
             throw new RuntimeException("Không tìm thấy lịch học");
         }
+        scheduleRepository.findById(id).ifPresent(schedule -> ensureEditable(schedule.getClassRoom()));
         scheduleRepository.deleteById(id);
+    }
+
+    private void ensureEditable(ClassRoom classRoom) {
+        if (classRoom.isArchived()) {
+            throw new IllegalStateException("Lớp đã lưu trữ, không thể thay đổi thời khóa biểu");
+        }
     }
 
     private ScheduleResponse toResponse(Schedule schedule) {

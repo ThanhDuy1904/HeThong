@@ -51,7 +51,7 @@
               <option value="">Tất cả lớp</option>
             </select>
             <button class="btn btn-outline btn-sm" onclick="loadDebtTable()"><i class="fa fa-sync"></i> Tải lại</button>
-            <button class="btn btn-primary btn-sm" id="close-class-btn" onclick="closeSelectedClass()"><i class="fa fa-file-pdf"></i> Lưu toàn bộ học phí</button>
+            <button class="btn btn-primary btn-sm" id="close-class-btn" onclick="closeSelectedClass()"><i class="fa fa-save"></i> Lưu toàn bộ học phí</button>
           </div>
           <input id="student-filter" type="search" placeholder="Tìm theo tên học sinh..." oninput="renderDebtTable()" style="margin:12px 20px;width:min(360px,calc(100% - 40px))">
         </div>
@@ -190,11 +190,18 @@
 
   async function closeSelectedClass() {
     if (!selectedClassId) return;
-    const requestedName = prompt('Nhập tên file lưu trữ (không cần nhập .pdf):', `hocphi_${selectedClassId}`);
+    const requestedName = prompt('Nhập tên file lưu trữ:', `hocphi_${selectedClassId}`);
     if (requestedName === null || !requestedName.trim()) return;
-    if (!confirm('Chỉ được lưu khi tất cả học sinh đã đóng đủ. Tiếp tục lưu PDF và reset học phí?')) return;
+    const format = prompt('Chọn định dạng lưu: nhập PDF hoặc Excel', 'PDF');
+    if (format === null) return;
+    const normalizedFormat = format.trim().toLowerCase();
+    if (!['pdf', 'excel', 'xlsx'].includes(normalizedFormat)) {
+      showToast('Định dạng không hợp lệ. Vui lòng chọn PDF hoặc Excel.', 'error');
+      return;
+    }
+    if (!confirm('Chỉ được lưu khi tất cả học sinh đã đóng đủ. Tiếp tục lưu bảng tổng hợp?')) return;
     try {
-      const result = await api.tuitionPayments.closeClass(selectedClassId, requestedName.trim());
+      const result = await api.tuitionPayments.closeClass(selectedClassId, requestedName.trim(), normalizedFormat);
       showToast(`Đã lưu ${result.data?.originalName || 'phiếu học phí'} vào lưu trữ`, 'success');
       await loadStats();
       await loadDebtTable();

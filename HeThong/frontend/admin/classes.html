@@ -170,7 +170,7 @@
     tbody.innerHTML = classes.map((c, i) => `
       <tr>
         <td>${i+1}</td>
-        <td><strong>${c.className}</strong></td>
+        <td><strong>${c.className}</strong> ${c.archived ? '<span class="badge badge-secondary">Đã lưu</span>' : ''}</td>
         <td>${c.grade || '—'}</td>
         <td>${c.schoolYear || '—'}</td>
         <td>${formatCurrency(c.tuitionFee)}</td>
@@ -182,8 +182,9 @@
         </td>
         <td>
           ${['ADMIN', 'ACADEMIC_AFFAIRS'].includes(getUser()?.role) ? `
-          <button class="btn btn-warning btn-sm" onclick="editClass(${c.id})"><i class="fa fa-edit"></i></button>
-          <button class="btn btn-danger btn-sm" onclick="deleteClass(${c.id})" style="margin-left:4px"><i class="fa fa-trash"></i></button>
+          ${c.archived ? '' : `<button class="btn btn-warning btn-sm" onclick="editClass(${c.id})"><i class="fa fa-edit"></i></button>`}
+          <button class="btn ${c.archived ? 'btn-success' : 'btn-secondary'} btn-sm" onclick="toggleArchiveClass(${c.id}, ${!!c.archived})" style="margin-left:4px"><i class="fa fa-${c.archived ? 'box-open' : 'box'}"></i> ${c.archived ? 'Mở' : 'Lưu'}</button>
+          ${c.archived ? '' : `<button class="btn btn-danger btn-sm" onclick="deleteClass(${c.id})" style="margin-left:4px"><i class="fa fa-trash"></i></button>`}
           ` : isAccountant() ? `<button class="btn btn-warning btn-sm" onclick="editTuition(${c.id}, '${c.className}', ${c.tuitionFee || 0})"><i class="fa fa-money-bill"></i></button>` : '<span style="color:#aaa">—</span>'}
         </td>
       </tr>
@@ -260,6 +261,16 @@
     if (Number.isNaN(feeNum) || feeNum < 0) {
       showToast('Học phí không hợp lệ', 'error');
       return;
+    }
+
+    async function toggleArchiveClass(id, archived) {
+      const action = archived ? 'mở lại' : 'lưu trữ';
+      if (!confirm(`Bạn có chắc muốn ${action} lớp này?`)) return;
+      try {
+        await api.classes.archive(id, !archived);
+        showToast(`Đã ${action} lớp`);
+        await loadClasses();
+      } catch (e) { showToast(e.message, 'error'); }
     }
     try {
       await api.classes.updateTuitionFee(id, feeNum);

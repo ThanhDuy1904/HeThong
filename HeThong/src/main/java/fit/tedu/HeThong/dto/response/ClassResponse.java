@@ -17,5 +17,6 @@ public class ClassResponse {
     private Long teacherId;
     private String teacherName;
     private long studentCount;
+    private boolean archived;
     private LocalDateTime createdAt;
 }

@@ -58,6 +58,8 @@
         <div style="padding:0 24px 14px;color:#64748b;font-size:.82rem">File Excel/CSV/Word: cột lần lượt Họ tên, SĐT, SĐT phụ huynh, Tên phụ huynh, Lớp. Nếu đã chọn lớp, tất cả học sinh sẽ được thêm vào lớp đó.</div>
         <div class="card-body" style="padding-bottom:0">
           <div class="form-group" style="max-width:420px;margin-bottom:16px">
+            <label for="school-year-select" style="font-weight:600">Năm học</label>
+            <select id="school-year-select" onchange="filterClassesByYear()"></select>
             <label for="class-select" style="font-weight:600">Chọn lớp</label>
             <select id="class-select" onchange="handleClassSelect()"></select>
           </div>
@@ -183,6 +185,7 @@
   let currentClassId = null;
   let currentStudents = [];
   let savedClassId = localStorage.getItem('student_page_class_id') || '';
+  let selectedSchoolYear = '';
 
   document.addEventListener('DOMContentLoaded', async () => {
     if (!requireAuth()) return;
@@ -214,7 +217,19 @@
   async function loadClasses() {
     try {
       const res = await api.classes.getAll();
-      allClasses = res.data;
+      allClasses = (res.data || []).filter(c => !c.archived);
+      const years = [...new Set(allClasses.map(c => c.schoolYear).filter(Boolean))].sort().reverse();
+      selectedSchoolYear = years.find(y => y === `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`) || years[0] || '';
+      document.getElementById('school-year-select').innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+      document.getElementById('school-year-select').value = selectedSchoolYear;
+      allClasses = allClasses.filter(c => !selectedSchoolYear || c.schoolYear === selectedSchoolYear);
+      renderStudentClassOptions();
+    } catch (e) {
+      document.getElementById('class-grid').innerHTML = '<div class="card" style="padding:18px;color:#f44">Không tải được danh sách lớp.</div>';
+    }
+  }
+
+  function renderStudentClassOptions() {
       const classSelect = document.getElementById('class-select');
       classSelect.innerHTML = '<option value="">-- Chọn lớp --</option>' +
         allClasses.map(c => `<option value="${c.id}">${c.className}</option>`).join('');
@@ -227,9 +242,11 @@
       } else if (allClasses.length) {
         selectClass(allClasses[0].id);
       }
-    } catch (e) {
-      document.getElementById('class-grid').innerHTML = '<div class="card" style="padding:18px;color:#f44">Không tải được danh sách lớp.</div>';
-    }
+  }
+
+  function filterClassesByYear() {
+    selectedSchoolYear = document.getElementById('school-year-select').value;
+    loadClasses();
   }
 
 
@@ -330,7 +347,7 @@
         <td><span class="badge ${s.status === 'ACTIVE' ? 'badge-success' : s.status === 'GRADUATED' ? 'badge-info' : 'badge-danger'}">
           ${s.status === 'ACTIVE' ? 'Đang học' : s.status === 'GRADUATED' ? 'Tốt nghiệp' : 'Nghỉ học'}</span></td>
         <td>
-          ${isAccountant() ? `<button class="btn btn-warning btn-sm" onclick="editTuition(${s.id})"><i class="fa fa-money-bill"></i></button>` : `<button class="btn btn-warning btn-sm" onclick="editStudent(${s.id})"><i class="fa fa-edit"></i></button>${['ADMIN', 'ACADEMIC_AFFAIRS', 'MANAGER'].includes(getUser()?.role) ? `<button class="btn btn-danger btn-sm" onclick="deleteStudent(${s.id})" style="margin-left:4px"><i class="fa fa-trash"></i></button>` : ''}`}
+          ${['ADMIN','ACCOUNTANT','MANAGER'].includes(getUser()?.role) ? `<button class="btn btn-warning btn-sm" onclick="editTuition(${s.id}, ${savedClassId || 'null'})"><i class="fa fa-money-bill"></i></button>` : `<button class="btn btn-warning btn-sm" onclick="editStudent(${s.id})"><i class="fa fa-edit"></i></button>${['ADMIN', 'ACADEMIC_AFFAIRS', 'MANAGER'].includes(getUser()?.role) ? `<button class="btn btn-danger btn-sm" onclick="deleteStudent(${s.id})" style="margin-left:4px"><i class="fa fa-trash"></i></button>` : ''}`}
         </td>
       </tr>
     `).join('');
@@ -373,10 +390,11 @@
     } catch (e) { showToast(e.message, 'error'); }
   }
 
-  async function editTuition(id) {
+  async function editTuition(id, selectedClassId = null) {
     try {
-      const res = await api.students.getById(id);
-      const s = res.data;
+      const res = selectedClassId ? await api.students.byClass(selectedClassId) : await api.students.getById(id);
+      const s = selectedClassId ? (res.data || []).find(item => String(item.id) === String(id)) : res.data;
+      if (!s) throw new Error('Không tìm thấy học sinh trong lớp đang chọn');
       const fee = prompt(`Nhập số tiền đã đóng cho ${s.fullName}`, s.tuitionPaidAmount || 0);
       if (fee === null) return;
       const payload = {
@@ -384,7 +402,7 @@
         dob: s.dob ? s.dob.substring(0, 10) : null,
         gender: s.gender,
         phone: s.phone,
-        classId: s.classId || null,
+        classId: selectedClassId || s.classId || null,
         address: s.address,
         parentName: s.parentName,
         parentPhone: s.parentPhone,
@@ -406,13 +424,13 @@
       gender:      document.getElementById('s-gender').value,
       phone:       document.getElementById('s-phone').value,
       classIds:    Array.from(document.querySelectorAll('input[name="student-class"]:checked')).map(o => Number(o.value)),
-      classId:     Number(document.querySelector('input[name="student-class"]:checked')?.value) || null,
+      classId:     Number(savedClassId || document.querySelector('input[name="student-class"]:checked')?.value) || null,
       address:     document.getElementById('s-address').value,
       parentName:  document.getElementById('s-parentName').value,
       parentPhone: document.getElementById('s-parentPhone').value,
       status:      document.getElementById('s-status').value,
       tuitionPaidAmount: document.getElementById('s-tuitionPaidAmount').value || 0,
-      tuitionPaidFull: Number(document.getElementById('s-tuitionPaidAmount').value || 0) >= Number((allClasses.find(c => String(c.id) === String(document.querySelector('input[name="student-class"]:checked')?.value)) || {}).tuitionFee || 0),
+      tuitionPaidFull: Number(document.getElementById('s-tuitionPaidAmount').value || 0) >= Number((allClasses.find(c => String(c.id) === String(savedClassId || document.querySelector('input[name="student-class"]:checked')?.value)) || {}).tuitionFee || 0),
     };
     if (!id) {
       payload.username = document.getElementById('s-username').value.trim() || null;

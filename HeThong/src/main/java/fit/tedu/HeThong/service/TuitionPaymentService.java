@@ -23,6 +23,14 @@ import java.time.LocalDateTime;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Optional;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import java.io.ByteArrayOutputStream;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.font.PDType0Font;
+import java.io.File;
 
 @Service
 @RequiredArgsConstructor
@@ -110,7 +118,7 @@ public class TuitionPaymentService {
     }
 
     @Transactional
-    public ArchiveFileResponse closeClass(Long classId, String requestedFileName, String username) {
+    public ArchiveFileResponse closeClass(Long classId, String requestedFileName, String format, String username) {
         List<Student> students = studentRepository.findByAnyClassId(classId);
         if (students.isEmpty()) throw new RuntimeException("Lớp chưa có học sinh");
         String className = students.stream().flatMap(s -> s.getClasses().stream())
@@ -131,47 +139,92 @@ public class TuitionPaymentService {
                 throw new RuntimeException("Chưa thể lưu: vẫn còn học sinh chưa đóng đủ học phí");
             }
         }
-        String fileName = requestedFileName.replaceAll("[^a-zA-Z0-9_-]", "_").trim();
+        String fileName = requestedFileName.trim();
         if (fileName.isBlank()) throw new RuntimeException("Tên file không hợp lệ");
-        if (!fileName.toLowerCase(Locale.ROOT).endsWith(".pdf")) fileName += ".pdf";
-        byte[] pdf = buildReceiptPdf(className, fee, students);
-        ArchiveFileResponse archived = archiveService.saveGenerated(fileName, pdf, "application/pdf", username);
-        students.forEach(student -> {
-            studentClassTuitionRepository.findByStudentIdAndClassRoomId(student.getId(), classId)
-                    .ifPresent(tuition -> {
-                        tuition.setPaidAmount(BigDecimal.ZERO);
-                        studentClassTuitionRepository.save(tuition);
-                    });
-            if (student.getClassRoom() != null && student.getClassRoom().getId().equals(classId)) {
-                student.setTuitionPaidAmount(BigDecimal.ZERO);
-                student.setTuitionPaidFull(false);
-            }
-        });
-        studentRepository.saveAll(students);
+        boolean excel = "xlsx".equalsIgnoreCase(format) || "excel".equalsIgnoreCase(format);
+        String extension = excel ? ".xlsx" : ".pdf";
+        fileName = fileName.replaceAll("[^\\p{L}\\p{N}._-]", "_");
+        if (!fileName.toLowerCase(Locale.ROOT).endsWith(extension)) fileName += extension;
+        byte[] content = excel ? buildTuitionWorkbook(className, fee, students) : buildReceiptPdf(className, fee, students);
+        String contentType = excel
+                ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                : "application/pdf";
+        ArchiveFileResponse archived = archiveService.saveGenerated(fileName, content, contentType, username);
         return archived;
     }
 
+    private byte[] buildTuitionWorkbook(String className, BigDecimal fee, List<Student> students) {
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Học phí");
+            Row title = sheet.createRow(0);
+            title.createCell(0).setCellValue("BẢNG TỔNG HỢP HỌC PHÍ");
+            title.createCell(1).setCellValue("Lớp: " + className);
+            title.createCell(2).setCellValue("Thời gian: " + LocalDateTime.now().toString());
+            Row header = sheet.createRow(2);
+            String[] columns = {"STT", "Họ và tên", "Lớp", "Học phí", "Đã đóng", "Còn lại", "Trạng thái"};
+            for (int i = 0; i < columns.length; i++) header.createCell(i).setCellValue(columns[i]);
+            int rowIndex = 3;
+            int number = 1;
+            for (Student student : students) {
+                Row row = sheet.createRow(rowIndex++);
+                row.createCell(0).setCellValue(number++);
+                row.createCell(1).setCellValue(student.getFullName());
+                row.createCell(2).setCellValue(className);
+                row.createCell(3).setCellValue(fee.doubleValue());
+                row.createCell(4).setCellValue(fee.doubleValue());
+                row.createCell(5).setCellValue(0);
+                row.createCell(6).setCellValue("Đã đóng đủ");
+            }
+            for (int i = 0; i < columns.length; i++) sheet.autoSizeColumn(i);
+            workbook.write(output);
+            return output.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException("Không thể tạo file Excel học phí", e);
+        }
+    }
+
     private byte[] buildReceiptPdf(String className, BigDecimal fee, List<Student> students) {
-        StringBuilder text = new StringBuilder("PHIEU CHOT HOC PHI\n");
-        text.append("Lop: ").append(className).append("\n");
-        text.append("Hoc phi moi hoc sinh: ").append(fee).append(" VND\n");
-        text.append("Thoi gian: ").append(LocalDateTime.now()).append("\n\n");
-        for (Student student : students) text.append(student.getFullName()).append(" - DA DONG DU\n");
-        String escaped = text.toString().replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
-                .replace("\n", ") Tj 0 -16 Td (");
-        String body = "BT /F1 11 Tf 50 780 Td (" + escaped + ") Tj ET";
-        String[] objects = {"<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-                "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
-                "<< /Length " + body.getBytes(StandardCharsets.US_ASCII).length + " >>\nstream\n" + body + "\nendstream",
-                "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"};
-        StringBuilder pdf = new StringBuilder("%PDF-1.4\n");
-        int[] offsets = new int[objects.length + 1];
-        for (int i = 0; i < objects.length; i++) { offsets[i + 1] = pdf.length(); pdf.append(i + 1).append(" 0 obj\n").append(objects[i]).append("\nendobj\n"); }
-        int xref = pdf.length();
-        pdf.append("xref\n0 ").append(objects.length + 1).append("\n0000000000 65535 f \n");
-        for (int i = 1; i < offsets.length; i++) pdf.append(String.format(Locale.ROOT, "%010d 00000 n \n", offsets[i]));
-        pdf.append("trailer\n<< /Size ").append(offsets.length).append(" /Root 1 0 R >>\nstartxref\n").append(xref).append("\n%%EOF");
-        return pdf.toString().getBytes(StandardCharsets.US_ASCII);
+        File fontFile = new File("C:\\Windows\\Fonts\\arial.ttf");
+        if (!fontFile.exists()) fontFile = new File("C:\\Windows\\Fonts\\tahoma.ttf");
+        if (!fontFile.exists()) throw new RuntimeException("Không tìm thấy font Unicode để tạo PDF");
+        try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            PDType0Font font = PDType0Font.load(document, fontFile);
+            PDPage page = new PDPage();
+            document.addPage(page);
+            PDPageContentStream stream = new PDPageContentStream(document, page);
+            stream.beginText();
+            stream.setFont(font, 16);
+            stream.newLineAtOffset(50, 780);
+            stream.showText("BẢNG TỔNG HỢP HỌC PHÍ");
+            stream.setFont(font, 11);
+            stream.newLineAtOffset(0, -24);
+            stream.showText("Lớp: " + className);
+            stream.newLineAtOffset(0, -16);
+            stream.showText("Học phí mỗi học sinh: " + fee.toPlainString() + " VNĐ");
+            stream.newLineAtOffset(0, -16);
+            stream.showText("Thời gian: " + LocalDateTime.now());
+            stream.newLineAtOffset(0, -28);
+            for (int i = 0; i < students.size(); i++) {
+                if (i > 0 && i % 38 == 0) {
+                    stream.endText();
+                    stream.close();
+                    page = new PDPage();
+                    document.addPage(page);
+                    stream = new PDPageContentStream(document, page);
+                    stream.beginText();
+                    stream.setFont(font, 11);
+                    stream.newLineAtOffset(50, 780);
+                }
+                stream.showText((i + 1) + ". " + students.get(i).getFullName() + " - ĐÃ ĐÓNG ĐỦ");
+                stream.newLineAtOffset(0, -16);
+            }
+            stream.endText();
+            stream.close();
+            document.save(output);
+            return output.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException("Không thể tạo file PDF học phí", e);
+        }
     }
 
     private TuitionPaymentResponse toResponse(TuitionPayment payment) {

@@ -27,6 +27,24 @@ public class ArchiveController {
     }
     @GetMapping("/{id}/download")
     public ResponseEntity<Resource> download(@PathVariable Long id) {
+        return fileResponse(id, "attachment");
+    }
+
+    @GetMapping("/{id}/view")
+    public ResponseEntity<Resource> view(@PathVariable Long id) {
+        return fileResponse(id, "inline");
+    }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> delete(@PathVariable Long id, java.security.Principal principal) {
+        boolean admin = org.springframework.security.core.context.SecurityContextHolder.getContext()
+                .getAuthentication().getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ADMIN"));
+        service.delete(id, principal.getName(), admin);
+        return ApiResponse.ok("Đã xóa file lưu trữ", null);
+    }
+
+    private ResponseEntity<Resource> fileResponse(Long id, String disposition) {
         ArchiveFile f = service.get(id);
         boolean admin = org.springframework.security.core.context.SecurityContextHolder.getContext()
                 .getAuthentication().getAuthorities().stream()
@@ -35,7 +53,7 @@ public class ArchiveController {
             throw new org.springframework.security.access.AccessDeniedException("Bạn không có quyền tải tài liệu này");
         }
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(f.getContentType()))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + f.getOriginalName().replace("\"", "") + "\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition + "; filename=\"" + f.getOriginalName().replace("\"", "") + "\"")
                 .body(service.download(id));
     }
     private String currentUsername() {

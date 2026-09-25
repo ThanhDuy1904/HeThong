@@ -29,6 +29,10 @@ public class ClassRoom {
     @Column(name = "tuition_fee", precision = 15, scale = 2)
     private BigDecimal tuitionFee;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean archived = false;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "teacher_id")
     private Teacher teacher;
