@@ -164,13 +164,15 @@ const api = {
         upload: (file) => { const form = new FormData(); form.append('file', file); return http('POST', '/archive', form); },
         viewUrl: (id) => `${API_BASE}/archive/${id}/view`,
         delete: (id) => http('DELETE', `/archive/${id}`),
-        view: async (id) => {
+        view: async (id, popup = null) => {
             const response = await fetch(`${API_BASE}/archive/${id}/view`, {
                 headers: { Authorization: `Bearer ${getToken()}` }
             });
             if (!response.ok) throw new Error('Không thể xem file');
             const url = URL.createObjectURL(await response.blob());
-            window.open(url, '_blank');
+            const target = popup || window.open('about:blank', '_blank');
+            if (!target) throw new Error('Trình duyệt đã chặn cửa sổ xem file');
+            target.location.href = url;
             setTimeout(() => URL.revokeObjectURL(url), 60000);
         },
         download: async (id, name) => {
