@@ -28,7 +28,7 @@ public class RevenueService {
         final String schoolYearFilter = selectedSchoolYear;
         List<RevenueClassResponse> byClass = new ArrayList<>();
         for (ClassRoom cls : classRoomRepository.findAll()) {
-            if (cls.isArchived() || !selectedSchoolYear.equalsIgnoreCase(
+            if (!selectedSchoolYear.equalsIgnoreCase(
                     cls.getSchoolYear() == null ? "" : cls.getSchoolYear().trim())) continue;
             BigDecimal fee = nz(cls.getTuitionFee());
             BigDecimal due = BigDecimal.ZERO;
@@ -47,7 +47,7 @@ public class RevenueService {
                     .remaining(remaining).uncollected(remaining).build());
         }
         Set<Long> classIds = classRoomRepository.findAll().stream()
-                .filter(c -> !c.isArchived() && schoolYearFilter.equalsIgnoreCase(
+                .filter(c -> schoolYearFilter.equalsIgnoreCase(
                         c.getSchoolYear() == null ? "" : c.getSchoolYear().trim()))
                 .map(ClassRoom::getId).collect(Collectors.toSet());
         List<TuitionPayment> payments = paymentRepository.findAll();
@@ -62,6 +62,7 @@ public class RevenueService {
         }
         BigDecimal due = byClass.stream().map(RevenueClassResponse::getTotalDue).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal remaining = byClass.stream().map(RevenueClassResponse::getRemaining).reduce(BigDecimal.ZERO, BigDecimal::add);
+        collected = due.subtract(remaining).max(BigDecimal.ZERO);
         BigDecimal expenses = expenseRepository.findAll().stream()
                 .filter(e -> e.getExpenseYear() == selectedYear
                         && (month == null || e.getExpenseMonth() == month))

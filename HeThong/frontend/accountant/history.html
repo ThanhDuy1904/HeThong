@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Lịch sử học phí - TEDU</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar"><div class="sidebar-brand"><span>🎓</span> TEDU Accountant</div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Quản lý</div>
+      <div class="nav-item" onclick="location.href='dashboard.html'"><i class="fa fa-money-bill-wave"></i> Quản lý học phí</div>
+      <div class="nav-item active"><i class="fa fa-clock-rotate-left"></i> Lịch sử</div>
+      <div class="nav-item" onclick="location.href='../admin/archive.html'"><i class="fa fa-folder-open"></i> Lưu trữ</div>
+      <div class="nav-item" onclick="location.href='../admin/revenue.html'"><i class="fa fa-chart-line"></i> Doanh thu</div>
+      <div class="nav-item" onclick="location.href='../admin/expenses.html'"><i class="fa fa-receipt"></i> Chi tiêu</div>
+    </nav>
+    <div class="sidebar-footer"><div class="user-info"><div class="user-avatar"><i class="fa fa-user"></i></div><div><div class="user-name" id="sidebar-username">---</div><div class="user-role" id="sidebar-role">---</div></div></div><button class="btn-logout" onclick="logout()"><i class="fa fa-sign-out-alt"></i> Đăng xuất</button></div>
+  </aside>
+  <main class="main-content"><div class="topbar"><div class="topbar-title"><i class="fa fa-clock-rotate-left"></i> Lịch sử học phí</div></div>
+    <div class="page-body">
+      <div class="card"><div class="card-body" style="display:flex;gap:12px;flex-wrap:wrap;align-items:end">
+        <label style="font-weight:600">Năm học<select id="school-year" style="display:block;margin-top:6px;min-width:180px;padding:10px;border:1px solid #d8dbea;border-radius:8px" onchange="loadHistory()"></select></label>
+        <label style="font-weight:600">Lớp<select id="class-filter" style="display:block;margin-top:6px;min-width:260px;padding:10px;border:1px solid #d8dbea;border-radius:8px" onchange="loadHistory()"></select></label>
+      </div></div>
+      <div class="card"><div class="card-header"><span><i class="fa fa-table"></i> Các lớp đã lưu học phí</span></div>
+        <div class="table-wrap"><table><thead><tr><th>#</th><th>Tên lớp</th><th>Năm học</th><th>Tổng học phí</th><th>Tổng đã đóng</th><th>Thao tác</th></tr></thead><tbody id="history-body"></tbody></table></div>
+      </div>
+      <div class="card" id="detail-card" style="display:none"><div class="card-header"><span id="detail-title">Chi tiết lớp</span></div>
+        <div class="table-wrap"><table><thead><tr><th>#</th><th>Họ tên</th><th>Học phí</th><th>Đã đóng</th><th>Còn lại</th><th>Trạng thái</th></tr></thead><tbody id="detail-body"></tbody></table></div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="../js/api.js"></script><script>
+let archivedClasses = [], selectedClassId = '';
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!requireAuth() || !['ACCOUNTANT','MANAGER'].includes(getUser()?.role)) { window.location.href='../user/dashboard.html'; return; }
+  renderUserInfo(); await loadClasses();
+});
+async function loadClasses() {
+  try {
+    const r = await api.classes.getAll();
+    archivedClasses = (r.data || []).filter(c => c.archived);
+    const years = [...new Set(archivedClasses.map(c => c.schoolYear).filter(Boolean))].sort().reverse();
+    const year = document.getElementById('school-year');
+    year.innerHTML = '<option value="">Tất cả năm học</option>' + years.map(y => `<option value="${y}">${y}</option>`).join('');
+    loadHistory();
+  } catch(e) { showToast(e.message,'error'); }
+}
+async function loadHistory() {
+  const year = document.getElementById('school-year').value;
+  const filter = document.getElementById('class-filter');
+  const classes = archivedClasses.filter(c => !year || c.schoolYear === year);
+  filter.innerHTML = '<option value="">Tất cả lớp</option>' + classes.map(c => `<option value="${c.id}">${c.className}</option>`).join('');
+  if (selectedClassId && classes.some(c => String(c.id) === String(selectedClassId))) filter.value = selectedClassId;
+  const rows = [];
+  for (const cls of classes.filter(c => !filter.value || String(c.id) === String(filter.value))) {
+    try {
+      const r = await api.students.byClass(cls.id);
+      const students = r.data || [];
+      rows.push({ cls, students, due: students.reduce((n,s)=>n+Number(s.classTuitionFee||cls.tuitionFee||0),0), paid: students.reduce((n,s)=>n+Number(s.tuitionPaidAmount||0),0) });
+    } catch(e) { showToast(e.message,'error'); }
+  }
+  document.getElementById('history-body').innerHTML = rows.length ? rows.map((x,i)=>`<tr><td>${i+1}</td><td><strong>${x.cls.className}</strong></td><td>${x.cls.schoolYear||'—'}</td><td>${formatCurrency(x.due)}</td><td>${formatCurrency(x.paid)}</td><td><button class="btn btn-outline btn-sm" onclick="showDetail(${x.cls.id})"><i class="fa fa-eye"></i> Chi tiết</button></td></tr>`).join('') : '<tr><td colspan="6" style="text-align:center;padding:25px;color:#888">Chưa có lớp đã lưu</td></tr>';
+  if (filter.value) showDetail(filter.value); else document.getElementById('detail-card').style.display='none';
+}
+async function showDetail(id) {
+  selectedClassId = String(id); document.getElementById('class-filter').value = selectedClassId;
+  const cls = archivedClasses.find(c=>String(c.id)===selectedClassId); const r = await api.students.byClass(id); const students=r.data||[];
+  document.getElementById('detail-card').style.display=''; document.getElementById('detail-title').textContent=`Chi tiết học phí lớp ${cls?.className||''}`;
+  document.getElementById('detail-body').innerHTML=students.map((s,i)=>`<tr><td>${i+1}</td><td>${s.fullName}</td><td>${formatCurrency(s.classTuitionFee)}</td><td>${formatCurrency(s.tuitionPaidAmount)}</td><td>${formatCurrency(s.tuitionRemaining)}</td><td><span class="badge badge-success">Đã lưu</span></td></tr>`).join('');
+}
+function formatCurrency(v){return Number(v||0).toLocaleString('vi-VN')+' đ';}
+</script></body></html>

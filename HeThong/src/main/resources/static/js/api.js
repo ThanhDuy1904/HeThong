@@ -350,6 +350,7 @@ function renderRoleNavigation() {
         ],
         MANAGER: [
             ['Quản lý học phí', '/accountant/dashboard.html', 'money-bill-wave']
+            ,['Lịch sử', '/accountant/history.html', 'clock-rotate-left']
             ,['Lưu trữ', '/admin/archive.html', 'folder-open']
             ,['Doanh thu', '/admin/revenue.html', 'chart-bar']
             ,['Chi tiêu', '/admin/expenses.html', 'receipt']

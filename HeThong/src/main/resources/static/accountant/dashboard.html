@@ -14,6 +14,7 @@
     <nav class="sidebar-nav">
       <div class="nav-section">Chính</div>
       <div class="nav-item active" onclick="location.href='dashboard.html'"><i class="fa fa-money-bill-wave"></i> Tổng quan học phí</div>
+      <div class="nav-item" onclick="location.href='history.html'"><i class="fa fa-clock-rotate-left"></i> Lịch sử</div>
       <div class="nav-item" onclick="location.href='../admin/students.html'"><i class="fa fa-user-graduate"></i> Quản lý học sinh</div>
       <div class="nav-item" onclick="location.href='../user/tuition.html'"><i class="fa fa-receipt"></i> Tra cứu học phí</div>
     </nav>
@@ -130,12 +131,17 @@
 
   async function loadStats() {
     try {
-      const res = await api.dashboard();
-      const d = res.data || {};
-      document.getElementById('stat-collected').textContent = formatCurrency(d.tuitionCollected);
-      document.getElementById('stat-remaining').textContent = formatCurrency(d.tuitionRemaining);
-      document.getElementById('stat-pending').textContent = d.tuitionPendingStudents ?? '—';
-      document.getElementById('stat-paid').textContent = d.tuitionPaidStudents ?? '—';
+      const classes = (await api.classes.getAll()).data || [];
+      const activeClasses = classes.filter(c => !c.archived);
+      const responses = await Promise.all(activeClasses.map(c => api.students.byClass(c.id)));
+      const all = responses.flatMap(r => r.data || []);
+      const students = new Map(all.map(s => [s.id, s]));
+      const collected = all.reduce((sum, s) => sum + Number(s.tuitionPaidAmount || 0), 0);
+      const remaining = all.reduce((sum, s) => sum + Number(s.tuitionRemaining || 0), 0);
+      document.getElementById('stat-collected').textContent = formatCurrency(collected);
+      document.getElementById('stat-remaining').textContent = formatCurrency(remaining);
+      document.getElementById('stat-pending').textContent = [...students.values()].filter(s => Number(s.tuitionRemaining || 0) > 0).length;
+      document.getElementById('stat-paid').textContent = [...students.values()].filter(s => Number(s.tuitionRemaining || 0) === 0).length;
     } catch (e) {
       showToast(e.message, 'error');
     }
