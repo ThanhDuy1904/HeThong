@@ -12,6 +12,7 @@ import fit.tedu.HeThong.repository.StudentRepository;
 import fit.tedu.HeThong.repository.TuitionPaymentRepository;
 import fit.tedu.HeThong.repository.UserRepository;
 import fit.tedu.HeThong.repository.StudentClassTuitionRepository;
+import fit.tedu.HeThong.repository.ClassRoomRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +42,7 @@ public class TuitionPaymentService {
     private final UserRepository userRepository;
     private final ArchiveService archiveService;
     private final StudentClassTuitionRepository studentClassTuitionRepository;
+    private final ClassRoomRepository classRoomRepository;
 
     @Transactional
     public void recordPaymentChange(Long studentId, BigDecimal amountDelta, BigDecimal balanceAfter, String note, String username) {
@@ -150,6 +152,16 @@ public class TuitionPaymentService {
                 ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 : "application/pdf";
         ArchiveFileResponse archived = archiveService.saveGenerated(fileName, content, contentType, username);
+        selectedClass.setArchived(true);
+        for (Student student : students) {
+            boolean hasActiveClass = student.getClasses().stream()
+                    .anyMatch(classRoom -> !classRoom.getId().equals(classId) && !classRoom.isArchived());
+            if (!hasActiveClass) {
+                student.setStatus("GRADUATED");
+                studentRepository.save(student);
+            }
+        }
+        classRoomRepository.save(selectedClass);
         return archived;
     }
 

@@ -142,7 +142,7 @@
             <select id="s-status">
               <option value="ACTIVE">Đang học</option>
               <option value="INACTIVE">Nghỉ học</option>
-              <option value="GRADUATED">Tốt nghiệp</option>
+              <option value="GRADUATED">Hoàn thành</option>
             </select>
           </div>
           <div class="form-group">
@@ -328,7 +328,7 @@
         <td>${s.phone || '—'}</td>
         <td>${s.parentPhone || '—'}</td>
         <td><span class="badge ${s.status === 'ACTIVE' ? 'badge-success' : s.status === 'GRADUATED' ? 'badge-info' : 'badge-danger'}">
-          ${s.status === 'ACTIVE' ? 'Đang học' : s.status === 'GRADUATED' ? 'Tốt nghiệp' : 'Nghỉ học'}</span></td>
+          ${s.status === 'ACTIVE' ? 'Đang học' : s.status === 'GRADUATED' ? 'Hoàn thành' : 'Nghỉ học'}</span></td>
         <td>
           ${['ACCOUNTANT','MANAGER'].includes(getUser()?.role) ? `<button class="btn btn-warning btn-sm" title="Cập nhật học phí" onclick="editTuition(${s.id}, ${savedClassId || 'null'})"><i class="fa fa-money-bill"></i></button>` : ''}
           ${['ADMIN','ACADEMIC_AFFAIRS','MANAGER'].includes(getUser()?.role) ? `<button class="btn btn-outline btn-sm" title="Chỉnh sửa học sinh" onclick="editStudent(${s.id})" style="margin-left:4px"><i class="fa fa-edit"></i></button><button class="btn btn-danger btn-sm" title="Xóa học sinh" onclick="deleteStudent(${s.id})" style="margin-left:4px"><i class="fa fa-trash"></i></button>` : ''}

@@ -120,7 +120,7 @@
   async function loadClassFilter() {
     try {
       const res = await api.classes.getAll();
-      const classes = res.data || [];
+      const classes = (res.data || []).filter(c => !c.archived);
       const filter = document.getElementById('class-filter');
       filter.innerHTML = '<option value="">Tất cả lớp</option>' + classes.map(c => `<option value="${c.id}">${c.className}</option>`).join('');
     } catch (e) {
@@ -146,7 +146,12 @@
       selectedClassId = document.getElementById('class-filter').value;
       localStorage.setItem('accountant_class_filter', selectedClassId);
       const classId = selectedClassId;
-      const res = classId ? await api.students.byClass(classId) : await api.students.getAll();
+        if (!classId) {
+          debtStudents = [];
+          renderDebtTable();
+          return;
+        }
+        const res = await api.students.byClass(classId);
       debtStudents = (res.data || [])
         .sort((a, b) => Number(b.tuitionRemaining || 0) - Number(a.tuitionRemaining || 0));
       renderDebtTable();
@@ -189,7 +194,10 @@
   }
 
   async function closeSelectedClass() {
-    if (!selectedClassId) return;
+    if (!selectedClassId) {
+      showToast('Vui lòng chọn một lớp trước khi lưu toàn bộ học phí', 'error');
+      return;
+    }
     const requestedName = prompt('Nhập tên file lưu trữ:', `hocphi_${selectedClassId}`);
     if (requestedName === null || !requestedName.trim()) return;
     const format = prompt('Chọn định dạng lưu: nhập PDF hoặc Excel', 'PDF');
@@ -203,6 +211,10 @@
     try {
       const result = await api.tuitionPayments.closeClass(selectedClassId, requestedName.trim(), normalizedFormat);
       showToast(`Đã lưu ${result.data?.originalName || 'phiếu học phí'} vào lưu trữ`, 'success');
+      selectedClassId = '';
+      localStorage.removeItem('accountant_class_filter');
+      await loadClassFilter();
+      document.getElementById('class-filter').value = '';
       await loadStats();
       await loadDebtTable();
     } catch (e) { showToast(e.message, 'error'); }
